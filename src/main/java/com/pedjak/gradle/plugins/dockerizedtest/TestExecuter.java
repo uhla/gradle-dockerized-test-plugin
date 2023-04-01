@@ -17,11 +17,10 @@ import org.gradle.internal.Factory;
 import org.gradle.internal.time.Clock;
 import org.gradle.internal.actor.ActorFactory;
 import org.gradle.internal.operations.BuildOperationExecutor;
-import org.gradle.internal.work.DefaultWorkerLeaseService;
 import org.gradle.internal.work.WorkerLeaseService;
 import org.gradle.process.internal.worker.WorkerProcessFactory;
 
-public class TestExecutor implements org.gradle.api.internal.tasks.testing.TestExecuter<JvmTestExecutionSpec>
+public class TestExecuter implements org.gradle.api.internal.tasks.testing.TestExecuter<JvmTestExecutionSpec>
 {
     private final WorkerProcessFactory workerFactory;
     private final ActorFactory actorFactory;
@@ -31,7 +30,7 @@ public class TestExecutor implements org.gradle.api.internal.tasks.testing.TestE
     private final Clock clock;
     private TestClassProcessor processor;
 
-    public TestExecutor(WorkerProcessFactory workerFactory, ActorFactory actorFactory, ModuleRegistry moduleRegistry, BuildOperationExecutor buildOperationExecutor, Clock clock, WorkerLeaseService workerLeaseService) {
+    public TestExecuter(WorkerProcessFactory workerFactory, ActorFactory actorFactory, ModuleRegistry moduleRegistry, BuildOperationExecutor buildOperationExecutor, Clock clock, WorkerLeaseService workerLeaseService) {
         this.workerFactory = workerFactory;
         this.actorFactory = actorFactory;
         this.moduleRegistry = moduleRegistry;
