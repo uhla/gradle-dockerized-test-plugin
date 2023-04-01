@@ -20,6 +20,9 @@ import com.github.dockerjava.api.DockerClient
 import com.github.dockerjava.core.DefaultDockerClientConfig
 import com.github.dockerjava.core.DockerClientBuilder
 import org.gradle.api.*
+import org.gradle.api.internal.file.FileCollectionFactory
+import org.gradle.api.model.ObjectFactory
+import org.gradle.api.publish.tasks.GenerateModuleMetadata
 import org.gradle.initialization.DefaultBuildCancellationToken
 import org.gradle.internal.concurrent.DefaultExecutorFactory
 import org.gradle.internal.concurrent.ExecutorFactory
@@ -60,7 +63,8 @@ class DockerizedTestPlugin implements Plugin<Project> {
         def ext = test.extensions.create("docker", DockerizedTestExtension, [] as Object[])
         def startParameter = project.gradle.startParameter
 
-        // TODO what should really be here?
+//
+//        throw new RuntimeException()
         ext.volumes = [ "$startParameter.gradleUserHomeDir": "$startParameter.gradleUserHomeDir",
                         "$project.projectDir":"$project.projectDir"]
         ext.user = currentUser
@@ -69,9 +73,10 @@ class DockerizedTestPlugin implements Plugin<Project> {
 
             if (extension?.image)
             {
-
+//                println("XXXXXXXX" + test)
+//                println("XXXXXXXX" + services.get(FileCollectionFactory).toString())
                 workerSemaphore.applyTo(test.project)
-                test.testExecuter = new TestExecutor(newProcessBuilderFactory(project, extension, test.processBuilderFactory, startParameter.gradleUserHomeDir), actorFactory, moduleRegistry, services.get(BuildOperationExecutor), services.get(Clock), services.get(WorkerLeaseService));
+                test.testExecuter = new TestExecutor(newProcessBuilderFactory(project, extension, test.processBuilderFactory, startParameter.gradleUserHomeDir, services), actorFactory, moduleRegistry, services.get(BuildOperationExecutor), services.get(Clock), services.get(WorkerLeaseService));
 
                 if (!extension.client)
                 {
@@ -100,13 +105,13 @@ class DockerizedTestPlugin implements Plugin<Project> {
         }
     }
 
-    def newProcessBuilderFactory(project, extension, defaultProcessBuilderFactory, gradleUserHome) {
+    def newProcessBuilderFactory(project, extension, defaultProcessBuilderFactory, gradleUserHome, services) {
 
         def executorFactory = new DefaultExecutorFactory()
         def executor = executorFactory.create("Docker container link")
         def buildCancellationToken = new DefaultBuildCancellationToken()
 
-        def execHandleFactory = [newJavaExec: { -> new DockerizedJavaExecHandleBuilder(extension, project.fileResolver, executor, buildCancellationToken, workerSemaphore)}] as JavaExecHandleFactory
+        def execHandleFactory = [newJavaExec: { -> new DockerizedJavaExecHandleBuilder(extension, project.fileResolver, executor, buildCancellationToken, workerSemaphore, services.get(FileCollectionFactory),services.get(ObjectFactory))}] as JavaExecHandleFactory
         new DefaultWorkerProcessFactory(defaultProcessBuilderFactory.loggingManager,
                                         messagingServer,
                                         defaultProcessBuilderFactory.workerImplementationFactory.classPathRegistry,
