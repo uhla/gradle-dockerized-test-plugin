@@ -52,6 +52,7 @@ class DockerizedJvmVersionDetector implements JvmVersionDetector
             try
             {
                 def v = imageJvms[(testExtension.image)]
+                println("v0 "+ v.toString())
                 if (!v)
                 {
                     def client = testExtension.client
@@ -60,6 +61,7 @@ class DockerizedJvmVersionDetector implements JvmVersionDetector
                             .withCmd(['java', '-version'])
 
                     def containerId = createCmd.exec().id
+                    println("before")
                     client.startContainerCmd(containerId).exec()
                     def w = new ByteArrayOutputStream()
                     client.attachContainerCmd(containerId)
@@ -82,6 +84,7 @@ class DockerizedJvmVersionDetector implements JvmVersionDetector
                             super.onNext(frame);
                         }
                     })
+                    println("after")
                     client.waitContainerCmd(containerId).exec(new WaitContainerResultCallback()).awaitStatusCode()
                     client.removeContainerCmd(containerId).withForce(true).exec()
 
@@ -89,6 +92,7 @@ class DockerizedJvmVersionDetector implements JvmVersionDetector
                     def reader = new BufferedReader(new StringReader(new String(w.getBytes())))
 
                     String versionStr = reader.readLine();
+                    println("versionstr1 "+ versionStr)
                     while (versionStr != null)
                     {
                         Matcher matcher = Pattern.compile("(?:java|openjdk) version \"(.+?)\"( \\d{4}-\\d{2}-\\d{2}( LTS)?)?").matcher(versionStr);
@@ -96,13 +100,16 @@ class DockerizedJvmVersionDetector implements JvmVersionDetector
                         {
                             v = JavaVersion.toVersion(matcher.group(1));
                             imageJvms[(testExtension.image)] = v
+                            println("v "+ v.toString())
                             return v
                         }
                         versionStr = reader.readLine();
+                        println("versionStr2 "+ versionStr)
                     }
 
 
                 } else {
+                    println("v2 "+ v.toString())
                     return v
                 }
             } finally
