@@ -147,7 +147,7 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
         this.buildCancellationToken = buildCancellationToken;
         this.testExtension = testExtension;
         shutdownHookAction = new ExecHandleShutdownHookAction(this);
-        broadcast = new ListenerBroadcast<ExecHandleListener>(ExecHandleListener.class);
+        broadcast = new ListenerBroadcast<>(ExecHandleListener.class);
         broadcast.addAll(listeners);
     }
 
