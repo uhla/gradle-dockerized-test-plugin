@@ -86,11 +86,13 @@ class DockerizedJvmVersionDetector implements JvmVersionDetector
                     })
                     println("after")
                     client.waitContainerCmd(containerId).exec(new WaitContainerResultCallback()).awaitStatusCode()
+                    println("1")
                     client.removeContainerCmd(containerId).withForce(true).exec()
+                    println("2")
 
                     // copied from org.gradle.internal.jvm.inspection.DefaultJvmVersionDetector.parseJavaVersionCommandOutput
                     def reader = new BufferedReader(new StringReader(new String(w.getBytes())))
-
+                    println("3")
                     String versionStr = reader.readLine();
                     println("versionstr1 "+ versionStr)
                     while (versionStr != null)
@@ -114,9 +116,11 @@ class DockerizedJvmVersionDetector implements JvmVersionDetector
                 }
             } finally
             {
+                println("finally")
                 lock.unlock()
             }
         }
+        println("throw?")
         throw new GradleException("Could not determine Java version in Docker image ${testExtension.image} ")
 
     }
