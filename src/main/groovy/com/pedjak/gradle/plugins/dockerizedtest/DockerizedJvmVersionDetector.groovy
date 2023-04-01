@@ -1,14 +1,12 @@
 package com.pedjak.gradle.plugins.dockerizedtest
 
-import com.github.dockerjava.api.DockerClient
+
 import com.github.dockerjava.api.model.Frame
 import com.github.dockerjava.api.model.StreamType
 import com.github.dockerjava.core.command.AttachContainerResultCallback
 import com.github.dockerjava.core.command.WaitContainerResultCallback
-import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream
 import org.gradle.api.GradleException
 import org.gradle.api.JavaVersion
-import org.gradle.api.UncheckedIOException
 import org.gradle.api.logging.Logger
 import org.gradle.api.logging.Logging
 import org.gradle.internal.jvm.JavaInfo
@@ -63,7 +61,7 @@ class DockerizedJvmVersionDetector implements JvmVersionDetector
 
                     def containerId = createCmd.exec().id
                     client.startContainerCmd(containerId).exec()
-                    def w = new ByteOutputStream()
+                    def w = new ByteArrayOutputStream()
                     client.attachContainerCmd(containerId)
                             .withFollowStream(true)
                             .withStdErr(true)
