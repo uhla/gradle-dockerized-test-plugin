@@ -17,6 +17,7 @@
 package com.pedjak.gradle.plugins.dockerizedtest;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -24,6 +25,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.concurrent.Executor;
@@ -64,9 +66,11 @@ import org.gradle.internal.service.ServiceRegistry;
 import org.gradle.internal.time.Clock;
 import org.gradle.internal.work.WorkerLeaseService;
 import org.gradle.process.internal.JavaExecHandleFactory;
+import org.gradle.process.internal.ProcessBuilderFactory;
 import org.gradle.process.internal.health.memory.MemoryManager;
 import org.gradle.process.internal.worker.DefaultWorkerProcessFactory;
 import org.gradle.process.internal.worker.WorkerProcessFactory;
+import org.gradle.process.internal.worker.child.ApplicationClassesInSystemClassLoaderWorkerImplementationFactory;
 
 import javax.inject.Inject;
 
@@ -74,7 +78,7 @@ import static com.pedjak.gradle.plugins.dockerizedtest.GroovyHelpers.getCurrentU
 
 class DockerizedTestPlugin implements Plugin<Project> {
 
-    private final String supportedVersion = "7.6";
+    private static final String supportedVersion = "7.6";
     private final String currentUser;
     private final MessagingServer messagingServer;
     private static final WorkerSemaphore workerSemaphore = new DefaultWorkerSemaphore();
@@ -97,7 +101,7 @@ class DockerizedTestPlugin implements Plugin<Project> {
         this.loggingManager = loggingManager;
     }
 
-    void configureTest(Project project, Task test) {
+    void configureTest(Project project, Test test) {
         DockerizedTestExtension ext = test.getExtensions().create("docker", DockerizedTestExtension.class);
         StartParameter startParameter = project.getGradle().getStartParameter();
 
@@ -109,14 +113,21 @@ class DockerizedTestPlugin implements Plugin<Project> {
         ext.setVolumes(volumesMap);
         ext.setUser(currentUser);
 
+
         test.doFirst(first -> {
             final DockerizedTestExtension docker = (DockerizedTestExtension) test.getExtensions().getByName("docker");
             if (docker.getImage() != null) {
                 workerSemaphore.applyTo(test.getProject());
-                test.setProperty("testExecuter", new TestExecuter(newProcessBuilderFactory(docker, //test.processBuilderFactory,
-                        startParameter.getGradleUserHomeDir(), serviceRegistry), actorFactory, moduleRegistry,
-                        serviceRegistry.get(BuildOperationExecutor.class),
-                        serviceRegistry.get(Clock.class), serviceRegistry.get(WorkerLeaseService.class)));
+
+                try {
+                    test.setProperty("testExecuter", new TestExecuter(newProcessBuilderFactory(docker,
+                            (DefaultWorkerProcessFactory) Objects.requireNonNull(test.property("processBuilderFactory")),
+                            startParameter.getGradleUserHomeDir(), serviceRegistry), actorFactory, moduleRegistry,
+                            serviceRegistry.get(BuildOperationExecutor.class),
+                            serviceRegistry.get(Clock.class), serviceRegistry.get(WorkerLeaseService.class)));
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
 
                 if (docker.getClient() == null) {
                     docker.setClient(createDefaultClient());
@@ -144,13 +155,13 @@ class DockerizedTestPlugin implements Plugin<Project> {
         project.getTasks().withType(Test.class).forEach(test -> configureTest(project, test));
         project.getTasks().whenTaskAdded((Action<? super Task>) task -> {
                     if (task instanceof Test) {
-                        configureTest(project, task);
+                        configureTest(project, (Test) task);
                     }
                 }
         );
     }
 
-    private WorkerProcessFactory newProcessBuilderFactory(DockerizedTestExtension extension, File gradleUserHome, ServiceRegistry services) {
+    private WorkerProcessFactory newProcessBuilderFactory(DockerizedTestExtension extension, final DefaultWorkerProcessFactory processBuilderFactory, File gradleUserHome, ServiceRegistry services) throws NoSuchFieldException, IllegalAccessException {
 
         ExecutorFactory executorFactory = new DefaultExecutorFactory();
         Executor executor = executorFactory.create("Docker container link");
@@ -165,10 +176,15 @@ class DockerizedTestPlugin implements Plugin<Project> {
                 services.get(TemporaryFileProvider.class),
                 services.get(PathToFileResolver.class)
         );
+        System.out.println(services.get(ProcessBuilderFactory.class));
+        final Field workerImplementationFactoryField = DefaultWorkerProcessFactory.class.getDeclaredField("workerImplementationFactory");
+        workerImplementationFactoryField.setAccessible(true);
+        ApplicationClassesInSystemClassLoaderWorkerImplementationFactory workerImplementationFactory1 = (ApplicationClassesInSystemClassLoaderWorkerImplementationFactory) workerImplementationFactoryField.get(processBuilderFactory);
 
+        // TODO handle these nulls, there must be way how to access these fields in java impl
         return new DefaultWorkerProcessFactory(loggingManager,
                 messagingServer,
-                null,// defaultProcessBuilderFactory.workerImplementationFactory.classPathRegistry,
+                processBuilderFactory.workerImplementationFactory.classPathRegistry,
                 null,//defaultProcessBuilderFactory.idGenerator,
                 gradleUserHome,
                 null,//defaultProcessBuilderFactory.workerImplementationFactory.temporaryFileProvider,
@@ -179,6 +195,7 @@ class DockerizedTestPlugin implements Plugin<Project> {
         );
     }
 
+    // TODO unused now, verify if it can be fixed
     class MessageServer implements MessagingServer {
         IncomingConnector connector;
         ExecutorFactory executorFactory;
