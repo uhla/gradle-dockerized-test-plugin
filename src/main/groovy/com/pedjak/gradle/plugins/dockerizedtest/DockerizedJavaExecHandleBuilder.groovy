@@ -18,8 +18,11 @@ package com.pedjak.gradle.plugins.dockerizedtest
 
 import org.gradle.api.internal.file.FileCollectionFactory
 import org.gradle.api.internal.file.FileResolver
+import org.gradle.api.internal.file.temp.TemporaryFileProvider
 import org.gradle.api.model.ObjectFactory
 import org.gradle.initialization.BuildCancellationToken
+import org.gradle.internal.file.PathToFileResolver
+import org.gradle.process.JavaForkOptions
 import org.gradle.process.internal.*
 import org.gradle.process.internal.streams.OutputStreamsForwarder
 
@@ -34,8 +37,8 @@ class DockerizedJavaExecHandleBuilder extends JavaExecHandleBuilder {
 
     private final WorkerSemaphore workersSemaphore
 
-    DockerizedJavaExecHandleBuilder(DockerizedTestExtension extension, FileResolver fileResolver, Executor executor, BuildCancellationToken buildCancellationToken, WorkerSemaphore workersSemaphore, FileCollectionFactory fileCollectionFactory, ObjectFactory objectFactory) {
-        super(fileResolver,fileCollectionFactory,objectFactory,executor,buildCancellationToken,null,null,null)
+    DockerizedJavaExecHandleBuilder(DockerizedTestExtension extension, FileResolver fileResolver, Executor executor, BuildCancellationToken buildCancellationToken, WorkerSemaphore workersSemaphore, FileCollectionFactory fileCollectionFactory, ObjectFactory objectFactory, TemporaryFileProvider temporaryFileProvider, PathToFileResolver pathToFileResolver) {
+        super(fileResolver,fileCollectionFactory,objectFactory,executor,buildCancellationToken,temporaryFileProvider,null, new DefaultJavaExecSpec(objectFactory,pathToFileResolver,fileCollectionFactory))
 //        super(fileResolver, executor, buildCancellationToken)
         this.extension = extension
         this.executor = executor

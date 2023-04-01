@@ -21,12 +21,14 @@ import com.github.dockerjava.core.DefaultDockerClientConfig
 import com.github.dockerjava.core.DockerClientBuilder
 import org.gradle.api.*
 import org.gradle.api.internal.file.FileCollectionFactory
+import org.gradle.api.internal.file.temp.TemporaryFileProvider
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.publish.tasks.GenerateModuleMetadata
 import org.gradle.initialization.DefaultBuildCancellationToken
 import org.gradle.internal.concurrent.DefaultExecutorFactory
 import org.gradle.internal.concurrent.ExecutorFactory
 import org.gradle.api.tasks.testing.Test
+import org.gradle.internal.file.PathToFileResolver
 import org.gradle.internal.operations.BuildOperationExecutor;
 import org.gradle.internal.remote.Address
 import org.gradle.internal.remote.ConnectionAcceptor
@@ -47,137 +49,144 @@ import javax.inject.Inject
 
 class DockerizedTestPlugin implements Plugin<Project> {
 
-    def supportedVersion = '7.6'
-    def currentUser
-    def messagingServer
-    def static workerSemaphore = new DefaultWorkerSemaphore()
-    def memoryManager = new NoMemoryManager()
+  def supportedVersion = '7.6'
+  def currentUser
+  def messagingServer
+  def static workerSemaphore = new DefaultWorkerSemaphore()
+  def memoryManager = new NoMemoryManager()
 
-    @Inject
-    DockerizedTestPlugin(MessagingServer messagingServer) {
-        this.currentUser = SystemUtils.IS_OS_WINDOWS ? "0" : "id -u".execute().text.trim()
-        this.messagingServer = new MessageServer(messagingServer.connector, messagingServer.executorFactory)
-    }
+  @Inject
+  DockerizedTestPlugin(MessagingServer messagingServer) {
+    this.currentUser = SystemUtils.IS_OS_WINDOWS ? "0" : "id -u".execute().text.trim()
+    this.messagingServer = new MessageServer(messagingServer.connector, messagingServer.executorFactory)
+  }
 
-    void configureTest(project, test) {
-        def ext = test.extensions.create("docker", DockerizedTestExtension, [] as Object[])
-        def startParameter = project.gradle.startParameter
+  void configureTest(project, test) {
+    def ext = test.extensions.create("docker", DockerizedTestExtension, [] as Object[])
+    def startParameter = project.gradle.startParameter
 
 //
 //        throw new RuntimeException()
-        ext.volumes = [ "$startParameter.gradleUserHomeDir": "$startParameter.gradleUserHomeDir",
-                        "$project.projectDir":"$project.projectDir"]
-        ext.user = currentUser
-        test.doFirst {
-            def extension = test.extensions.docker
+    ext.volumes = ["$startParameter.gradleUserHomeDir": "$startParameter.gradleUserHomeDir",
+                   "$project.projectDir"              : "$project.projectDir"]
+    ext.user = currentUser
+    test.doFirst {
+      def extension = test.extensions.docker
 
-            if (extension?.image)
-            {
+      if (extension?.image) {
 //                println("XXXXXXXX" + test)
 //                println("XXXXXXXX" + services.get(FileCollectionFactory).toString())
-                workerSemaphore.applyTo(test.project)
-                test.testExecuter = new TestExecutor(newProcessBuilderFactory(project, extension, test.processBuilderFactory, startParameter.gradleUserHomeDir, services), actorFactory, moduleRegistry, services.get(BuildOperationExecutor), services.get(Clock), services.get(WorkerLeaseService));
+        workerSemaphore.applyTo(test.project)
+        test.testExecuter = new TestExecutor(newProcessBuilderFactory(project, extension, test.processBuilderFactory, startParameter.gradleUserHomeDir, services), actorFactory, moduleRegistry, services.get(BuildOperationExecutor), services.get(Clock), services.get(WorkerLeaseService));
 
-                if (!extension.client)
-                {
-                    extension.client = createDefaultClient()
-                }
-            }
-
+        if (!extension.client) {
+          extension.client = createDefaultClient()
         }
-    }
+      }
 
-    static DockerClient createDefaultClient() {
-        DockerClientBuilder.getInstance(DefaultDockerClientConfig.createDefaultConfigBuilder().build())
-        // TODO?
+    }
+  }
+
+  static DockerClient createDefaultClient() {
+    DockerClientBuilder.getInstance(DefaultDockerClientConfig.createDefaultConfigBuilder().build())
+    // TODO?
 //                    .withDockerCmdExecFactory(new DockerHttpClient()new NettyDockerCmdExecFactory())
-                    .build()
+        .build()
+  }
+
+  void apply(Project project) {
+
+    boolean unsupportedVersion = new ComparableVersion(project.gradle.gradleVersion).compareTo(new ComparableVersion(supportedVersion)) < 0
+    if (unsupportedVersion) throw new GradleException("dockerized-test plugin requires Gradle ${supportedVersion}+")
+
+    project.tasks.withType(Test).each { test -> configureTest(project, test) }
+    project.tasks.whenTaskAdded { task ->
+      if (task instanceof Test) configureTest(project, task)
+    }
+  }
+
+  def newProcessBuilderFactory(project, extension, defaultProcessBuilderFactory, gradleUserHome, services) {
+
+    def executorFactory = new DefaultExecutorFactory()
+    def executor = executorFactory.create("Docker container link")
+    def buildCancellationToken = new DefaultBuildCancellationToken()
+
+    def execHandleFactory = [newJavaExec: { ->
+      new DockerizedJavaExecHandleBuilder(extension,
+          project.fileResolver,
+          executor,
+          buildCancellationToken,
+          workerSemaphore,
+          services.get(FileCollectionFactory),
+          services.get(ObjectFactory),
+          services.get(TemporaryFileProvider),
+          services.get(PathToFileResolver)
+      )
+    }] as JavaExecHandleFactory
+    new DefaultWorkerProcessFactory(defaultProcessBuilderFactory.loggingManager,
+        messagingServer,
+        defaultProcessBuilderFactory.workerImplementationFactory.classPathRegistry,
+        defaultProcessBuilderFactory.idGenerator,
+        gradleUserHome,
+        defaultProcessBuilderFactory.workerImplementationFactory.temporaryFileProvider,
+        execHandleFactory,
+        new DockerizedJvmVersionDetector(extension),
+        defaultProcessBuilderFactory.outputEventListener,
+        memoryManager
+    )
+  }
+
+  class MessageServer implements MessagingServer {
+    IncomingConnector connector;
+    ExecutorFactory executorFactory;
+
+    MessageServer(IncomingConnector connector, ExecutorFactory executorFactory) {
+      this.connector = connector;
+      this.executorFactory = executorFactory;
     }
 
-    void apply(Project project) {
-
-        boolean unsupportedVersion = new ComparableVersion(project.gradle.gradleVersion).compareTo(new ComparableVersion(supportedVersion)) < 0
-        if (unsupportedVersion) throw new GradleException("dockerized-test plugin requires Gradle ${supportedVersion}+")
-
-        project.tasks.withType(Test).each { test -> configureTest(project, test) }
-        project.tasks.whenTaskAdded { task ->
-            if (task instanceof Test) configureTest(project, task)
-        }
+    ConnectionAcceptor accept(Action<ObjectConnection> action) {
+      return new ConnectionAcceptorDelegate(connector.accept(new ConnectEventAction(action, executorFactory), true))
     }
 
-    def newProcessBuilderFactory(project, extension, defaultProcessBuilderFactory, gradleUserHome, services) {
 
-        def executorFactory = new DefaultExecutorFactory()
-        def executor = executorFactory.create("Docker container link")
-        def buildCancellationToken = new DefaultBuildCancellationToken()
+  }
 
-        def execHandleFactory = [newJavaExec: { -> new DockerizedJavaExecHandleBuilder(extension, project.fileResolver, executor, buildCancellationToken, workerSemaphore, services.get(FileCollectionFactory),services.get(ObjectFactory))}] as JavaExecHandleFactory
-        new DefaultWorkerProcessFactory(defaultProcessBuilderFactory.loggingManager,
-                                        messagingServer,
-                                        defaultProcessBuilderFactory.workerImplementationFactory.classPathRegistry,
-                                        defaultProcessBuilderFactory.idGenerator,
-            gradleUserHome,
-                                        defaultProcessBuilderFactory.workerImplementationFactory.temporaryFileProvider,
-                                        execHandleFactory,
-                                        new DockerizedJvmVersionDetector(extension),
-                                        defaultProcessBuilderFactory.outputEventListener,
-                                        memoryManager
-                                        )
+  class ConnectEventAction implements Action<ConnectCompletion> {
+    def action;
+    def executorFactory;
+
+    ConnectEventAction(Action<ObjectConnection> action, executorFactory) {
+      this.executorFactory = executorFactory
+      this.action = action
     }
 
-    class MessageServer implements MessagingServer {
-        IncomingConnector connector;
-        ExecutorFactory executorFactory;
+    void execute(ConnectCompletion completion) {
+      action.execute(new MessageHubBackedObjectConnection(executorFactory, completion));
+    }
+  }
 
-        MessageServer(IncomingConnector connector, ExecutorFactory executorFactory) {
-            this.connector = connector;
-            this.executorFactory = executorFactory;
-        }
+  class ConnectionAcceptorDelegate implements ConnectionAcceptor {
 
-        ConnectionAcceptor accept(Action<ObjectConnection> action) {
-            return new ConnectionAcceptorDelegate(connector.accept(new ConnectEventAction(action, executorFactory), true))
-        }
+    MultiChoiceAddress address
 
+    @Delegate
+    ConnectionAcceptor delegate
 
+    ConnectionAcceptorDelegate(ConnectionAcceptor delegate) {
+      this.delegate = delegate
     }
 
-    class ConnectEventAction implements Action<ConnectCompletion> {
-        def action;
-        def executorFactory;
-
-        ConnectEventAction(Action<ObjectConnection> action, executorFactory) {
-            this.executorFactory = executorFactory
-            this.action = action
+    Address getAddress() {
+      synchronized (delegate) {
+        if (address == null) {
+          def remoteAddresses = NetworkInterface.networkInterfaces.findAll { it.up && !it.loopback }*.inetAddresses*.collect { it }.flatten()
+          def original = delegate.address
+          address = new MultiChoiceAddress(original.canonicalAddress, original.port, remoteAddresses)
         }
-
-        void execute(ConnectCompletion completion) {
-            action.execute(new MessageHubBackedObjectConnection(executorFactory, completion));
-        }
+      }
+      address
     }
-
-    class ConnectionAcceptorDelegate implements ConnectionAcceptor {
-
-        MultiChoiceAddress address
-
-        @Delegate
-        ConnectionAcceptor delegate
-
-        ConnectionAcceptorDelegate(ConnectionAcceptor delegate) {
-            this.delegate = delegate
-        }
-
-        Address getAddress() {
-            synchronized (delegate)
-            {
-                if (address == null)
-                {
-                    def remoteAddresses = NetworkInterface.networkInterfaces.findAll { it.up && !it.loopback }*.inetAddresses*.collect { it }.flatten()
-                    def original = delegate.address
-                    address = new MultiChoiceAddress(original.canonicalAddress, original.port, remoteAddresses)
-                }
-            }
-            address
-        }
-    }
+  }
 
 }
