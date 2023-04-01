@@ -59,10 +59,9 @@ class DockerizedTestPlugin implements Plugin<Project> {
     void configureTest(project, test) {
         def ext = test.extensions.create("docker", DockerizedTestExtension, [] as Object[])
         def startParameter = project.gradle.startParameter
+
         // TODO what should really be here?
-//        ext.volumes = [ "$startParameter.gradleUserHomeDir": "$startParameter.gradleUserHomeDir",
-//                        "$project.projectDir":"$project.projectDir"]
-        ext.volumes = [
+        ext.volumes = [ "$startParameter.gradleUserHomeDir": "$startParameter.gradleUserHomeDir",
                         "$project.projectDir":"$project.projectDir"]
         ext.user = currentUser
         test.doFirst {
@@ -72,7 +71,7 @@ class DockerizedTestPlugin implements Plugin<Project> {
             {
 
                 workerSemaphore.applyTo(test.project)
-                test.testExecuter = new TestExecutor(newProcessBuilderFactory(project, extension, test.processBuilderFactory), actorFactory, moduleRegistry, services.get(BuildOperationExecutor), services.get(Clock), services.get(WorkerLeaseService));
+                test.testExecuter = new TestExecutor(newProcessBuilderFactory(project, extension, test.processBuilderFactory, startParameter.gradleUserHomeDir), actorFactory, moduleRegistry, services.get(BuildOperationExecutor), services.get(Clock), services.get(WorkerLeaseService));
 
                 if (!extension.client)
                 {
@@ -101,7 +100,7 @@ class DockerizedTestPlugin implements Plugin<Project> {
         }
     }
 
-    def newProcessBuilderFactory(project, extension, defaultProcessBuilderFactory) {
+    def newProcessBuilderFactory(project, extension, defaultProcessBuilderFactory, gradleUserHome) {
 
         def executorFactory = new DefaultExecutorFactory()
         def executor = executorFactory.create("Docker container link")
@@ -112,7 +111,7 @@ class DockerizedTestPlugin implements Plugin<Project> {
                                         messagingServer,
                                         defaultProcessBuilderFactory.workerImplementationFactory.classPathRegistry,
                                         defaultProcessBuilderFactory.idGenerator,
-                                        defaultProcessBuilderFactory.gradleUserHomeDir,
+            gradleUserHome,
                                         defaultProcessBuilderFactory.workerImplementationFactory.temporaryFileProvider,
                                         execHandleFactory,
                                         new DockerizedJvmVersionDetector(extension),

@@ -9,7 +9,7 @@ plugins {
 
 //rootProject.name = "dockerized-test"
 group = 'com.github.pedjak.dockerized-test'
-version = '0.5.11'
+version = '0.5.11-SNAPSHOT'
 
 apply plugin: 'groovy'
 apply plugin: 'idea'
