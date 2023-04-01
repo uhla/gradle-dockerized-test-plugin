@@ -16,13 +16,13 @@
 
 package com.pedjak.gradle.plugins.dockerizedtest;
 
+import com.github.dockerjava.api.command.WaitContainerResultCallback;
+import com.github.dockerjava.core.command.AttachContainerResultCallback;
 import com.google.common.base.Joiner;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.model.*;
-import com.github.dockerjava.core.command.AttachContainerResultCallback;
-import com.github.dockerjava.core.command.WaitContainerResultCallback;
 import com.github.dockerjava.core.util.CompressArchiveUtil;
 import groovy.lang.Closure;
 import org.gradle.api.logging.Logger;
@@ -33,10 +33,11 @@ import org.gradle.internal.event.ListenerBroadcast;
 import org.gradle.internal.operations.CurrentBuildOperationPreservingRunnable;
 import org.gradle.process.ExecResult;
 import org.gradle.process.internal.*;
-import org.gradle.process.internal.shutdown.ShutdownHookActionRegister;
+import org.gradle.process.internal.shutdown.ShutdownHooks;
 
 import javax.annotation.Nullable;
 import java.io.*;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -94,8 +95,8 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
     private final StreamsHandler outputHandler;
     private final StreamsHandler inputHandler;
     private final boolean redirectErrorStream;
-    private int timeoutMillis;
-    private boolean daemon;
+    private final int timeoutMillis;
+    private final boolean daemon;
 
     /**
      * Lock to guard all mutable state
@@ -205,7 +206,7 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
     }
 
     private void setEndStateInfo(ExecHandleState newState, int exitValue, Throwable failureCause) {
-        ShutdownHookActionRegister.removeAction(shutdownHookAction);
+        ShutdownHooks.removeShutdownHook(shutdownHookAction);
         buildCancellationToken.removeCallback(shutdownHookAction);
         ExecHandleState currentState;
         lock.lock();
@@ -341,7 +342,7 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
     }
 
     void started() {
-        ShutdownHookActionRegister.addAction(shutdownHookAction);
+        ShutdownHooks.addShutdownHook(shutdownHookAction);
         buildCancellationToken.addCallback(shutdownHookAction);
         setState(ExecHandleState.STARTED);
         broadcast.getSource().executionStarted(this);
@@ -393,26 +394,19 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
                 File optionFile = new File(arg.substring(1));
                 if (optionFile.isFile()) {
                     boolean copyingDone = false;
-                    File tar = CompressArchiveUtil.archiveTARFiles(new File("/"), Arrays.asList(optionFile), optionFile.getName());
+                    File tar = CompressArchiveUtil.archiveTARFiles(new File("/"), Collections.singletonList(optionFile), optionFile.getName());
                     for (int i = 0; i < 10; i++)
                     {
-                        FileInputStream tarInputStream = null;
-                        try
-                        {
-                            tarInputStream = new FileInputStream(tar);
+                        try (FileInputStream tarInputStream = new FileInputStream(tar)) {
                             client.copyArchiveToContainerCmd(containerId)
                                     .withRemotePath("/")
                                     .withTarInputStream(tarInputStream)
                                     .exec();
                             copyingDone = true;
-                            tar.delete();
+                            Files.deleteIfExists(tar.toPath());
                             break;
                         } catch (Exception e) {
                             LOGGER.warn("Failed copying option file {} via tar {} to container {}", optionFile, tar, containerId, e);
-                        } finally {
-                            if (tarInputStream != null) {
-                                tarInputStream.close();
-                            }
                         }
                     }
                     if (!copyingDone) {
@@ -427,7 +421,7 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
         try
         {
             DockerClient client = testExtension.getClient();
-            CreateContainerCmd createCmd = client.createContainerCmd(testExtension.getImage().toString())
+            CreateContainerCmd createCmd = client.createContainerCmd(testExtension.getImage())
                     .withTty(false)
                     .withStdinOpen(true)
                     .withStdInOnce(true)
@@ -455,13 +449,11 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
             client.startContainerCmd(containerId).exec();
             invokeIfNotNull(testExtension.getAfterContainerStart(), containerId, client);
 
-            if (!client.inspectContainerCmd(containerId).exec().getState().getRunning()) {
+            if (Boolean.FALSE.equals(client.inspectContainerCmd(containerId).exec().getState().getRunning())) {
                 throw new RuntimeException("Container "+containerId+" not running!");
             }
 
-            Process proc = new DockerizedProcess(client, containerId, testExtension.getAfterContainerStop());
-
-            return proc;
+            return new DockerizedProcess(client, containerId, testExtension.getAfterContainerStop());
         } catch (Exception e) {
             LOGGER.error("Failed to create container " + displayName, new RuntimeException(e));
             throw new RuntimeException(e);
@@ -492,8 +484,8 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
     private void bindVolumes(CreateContainerCmd cmd) {
         List<Volume> volumes = new ArrayList<Volume>();
         List<Bind> binds = new ArrayList<Bind>();
-        for (Iterator it = testExtension.getVolumes().entrySet().iterator(); it.hasNext(); ) {
-            Map.Entry<Object, Object> e = (Map.Entry<Object, Object>) it.next();
+        for (final Object o : testExtension.getVolumes().entrySet()) {
+            Map.Entry<Object, Object> e = (Map.Entry<Object, Object>) o;
             Volume volume = new Volume(e.getValue().toString());
             Bind bind = new Bind(e.getKey().toString(), volume);
             binds.add(bind);
@@ -552,6 +544,12 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
         }
 
         @Override
+        public void disconnect() {
+            inputHandler.disconnect();
+            outputHandler.disconnect();
+        }
+
+        @Override
         public void stop() {
             inputHandler.stop();
             outputHandler.stop();
@@ -572,7 +570,7 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
         private final PipedOutputStream stdErrWriteStream = new PipedOutputStream(stdErrReadStream);
 
         private final CountDownLatch finished = new CountDownLatch(1);
-        private AtomicInteger exitCode = new AtomicInteger();
+        private final AtomicInteger exitCode = new AtomicInteger();
         private final AttachContainerResultCallback attachContainerResultCallback = new AttachContainerResultCallback() {
             @Override public void onNext(Frame frame)
             {

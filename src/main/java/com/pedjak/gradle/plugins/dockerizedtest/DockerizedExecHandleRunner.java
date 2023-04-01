@@ -22,7 +22,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
-import org.gradle.internal.concurrent.ExecutorFactory;
 import org.gradle.process.internal.StreamsHandler;
 
 public class DockerizedExecHandleRunner implements Runnable {

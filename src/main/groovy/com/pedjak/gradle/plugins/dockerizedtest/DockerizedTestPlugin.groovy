@@ -19,7 +19,6 @@ package com.pedjak.gradle.plugins.dockerizedtest
 import com.github.dockerjava.api.DockerClient
 import com.github.dockerjava.core.DefaultDockerClientConfig
 import com.github.dockerjava.core.DockerClientBuilder
-import com.github.dockerjava.netty.NettyDockerCmdExecFactory
 import org.gradle.api.*
 import org.gradle.initialization.DefaultBuildCancellationToken
 import org.gradle.internal.concurrent.DefaultExecutorFactory
@@ -37,6 +36,7 @@ import org.apache.maven.artifact.versioning.ComparableVersion
 import org.gradle.internal.remote.internal.hub.MessageHubBackedObjectConnection
 import org.gradle.internal.remote.internal.inet.MultiChoiceAddress
 import org.gradle.internal.time.Clock
+import org.gradle.internal.work.WorkerLeaseService
 import org.gradle.process.internal.JavaExecHandleFactory
 import org.gradle.process.internal.worker.DefaultWorkerProcessFactory
 
@@ -44,7 +44,7 @@ import javax.inject.Inject
 
 class DockerizedTestPlugin implements Plugin<Project> {
 
-    def supportedVersion = '4.8'
+    def supportedVersion = '7.6'
     def currentUser
     def messagingServer
     def static workerSemaphore = new DefaultWorkerSemaphore()
@@ -59,7 +59,10 @@ class DockerizedTestPlugin implements Plugin<Project> {
     void configureTest(project, test) {
         def ext = test.extensions.create("docker", DockerizedTestExtension, [] as Object[])
         def startParameter = project.gradle.startParameter
-        ext.volumes = [ "$startParameter.gradleUserHomeDir": "$startParameter.gradleUserHomeDir",
+        // TODO what should really be here?
+//        ext.volumes = [ "$startParameter.gradleUserHomeDir": "$startParameter.gradleUserHomeDir",
+//                        "$project.projectDir":"$project.projectDir"]
+        ext.volumes = [
                         "$project.projectDir":"$project.projectDir"]
         ext.user = currentUser
         test.doFirst {
@@ -69,7 +72,7 @@ class DockerizedTestPlugin implements Plugin<Project> {
             {
 
                 workerSemaphore.applyTo(test.project)
-                test.testExecuter = new TestExecuter(newProcessBuilderFactory(project, extension, test.processBuilderFactory), actorFactory, moduleRegistry, services.get(BuildOperationExecutor), services.get(Clock));
+                test.testExecuter = new TestExecutor(newProcessBuilderFactory(project, extension, test.processBuilderFactory), actorFactory, moduleRegistry, services.get(BuildOperationExecutor), services.get(Clock), services.get(WorkerLeaseService));
 
                 if (!extension.client)
                 {
@@ -80,9 +83,10 @@ class DockerizedTestPlugin implements Plugin<Project> {
         }
     }
 
-    DockerClient createDefaultClient() {
-        DockerClientBuilder.getInstance(DefaultDockerClientConfig.createDefaultConfigBuilder())
-                    .withDockerCmdExecFactory(new NettyDockerCmdExecFactory())
+    static DockerClient createDefaultClient() {
+        DockerClientBuilder.getInstance(DefaultDockerClientConfig.createDefaultConfigBuilder().build())
+        // TODO?
+//                    .withDockerCmdExecFactory(new DockerHttpClient()new NettyDockerCmdExecFactory())
                     .build()
     }
 
@@ -118,15 +122,15 @@ class DockerizedTestPlugin implements Plugin<Project> {
     }
 
     class MessageServer implements MessagingServer {
-        def IncomingConnector connector;
-        def ExecutorFactory executorFactory;
+        IncomingConnector connector;
+        ExecutorFactory executorFactory;
 
-        public MessageServer(IncomingConnector connector, ExecutorFactory executorFactory) {
+        MessageServer(IncomingConnector connector, ExecutorFactory executorFactory) {
             this.connector = connector;
             this.executorFactory = executorFactory;
         }
 
-        public ConnectionAcceptor accept(Action<ObjectConnection> action) {
+        ConnectionAcceptor accept(Action<ObjectConnection> action) {
             return new ConnectionAcceptorDelegate(connector.accept(new ConnectEventAction(action, executorFactory), true))
         }
 
@@ -137,12 +141,12 @@ class DockerizedTestPlugin implements Plugin<Project> {
         def action;
         def executorFactory;
 
-        public ConnectEventAction(Action<ObjectConnection> action, executorFactory) {
+        ConnectEventAction(Action<ObjectConnection> action, executorFactory) {
             this.executorFactory = executorFactory
             this.action = action
         }
 
-        public void execute(ConnectCompletion completion) {
+        void execute(ConnectCompletion completion) {
             action.execute(new MessageHubBackedObjectConnection(executorFactory, completion));
         }
     }

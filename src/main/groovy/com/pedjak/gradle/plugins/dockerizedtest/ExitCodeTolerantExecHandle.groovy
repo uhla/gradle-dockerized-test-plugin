@@ -39,6 +39,11 @@ class ExitCodeTolerantExecHandle implements ExecHandle {
         delegate.addListener(new ExecHandleListener() {
 
             @Override
+            void beforeExecutionStarted(final ExecHandle execHandle) {
+
+            }
+
+            @Override
             void executionStarted(ExecHandle execHandle) {
                 // do nothing
             }

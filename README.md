@@ -1,3 +1,6 @@
+`./gradlew publishToMavenLocal`
+
+
 [![Download](https://api.bintray.com/packages/pedjak/gradle-plugins/dockerized-test/images/download.svg) ](https://bintray.com/pedjak/gradle-plugins/dockerized-test/_latestVersion)
 [![license](https://img.shields.io/github/license/pedjak/gradle-dockerized-test-plugin.svg)]()
 
@@ -28,7 +31,7 @@ Usage
             maven { url = "http://dl.bintray.com/pedjak/gradle-plugins"}
         }
         dependencies {
-            classpath "com.pedjak.gradle.plugins:dockerized-test:0.5"
+            classpath "com.pedjak.gradle.plugins:dockerized-test:0.5.10"
         }
     }
     

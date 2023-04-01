@@ -9,6 +9,7 @@ import org.gradle.api.internal.classpath.ModuleRegistry;
 import org.gradle.api.internal.tasks.testing.*;
 import org.gradle.api.internal.tasks.testing.worker.RemoteTestClassProcessor;
 import org.gradle.api.internal.tasks.testing.worker.TestEventSerializer;
+import org.gradle.api.tasks.testing.TestFailure;
 import org.gradle.api.tasks.testing.TestResult;
 import org.gradle.internal.remote.ObjectConnection;
 import org.gradle.process.JavaForkOptions;
@@ -72,7 +73,7 @@ public class ForkingTestClassProcessor implements TestClassProcessor
             // instead just report to the result processor this is failuer for the whole test class
             // this way, Gradle will be able to generate test reports where such failure is visible as well
             resultProcessor.started( new DefaultTestClassDescriptor(testClass, testClass.getTestClassName()), new TestStartEvent(System.currentTimeMillis()));
-            resultProcessor.failure(testClass, new RuntimeException("Could not run tests for "+testClass.getTestClassName() + " - tried 10 times", exception));
+            resultProcessor.failure(testClass, TestFailure.fromTestFrameworkFailure(new RuntimeException("Could not run tests for "+testClass.getTestClassName() + " - tried 10 times", exception)));
             resultProcessor.completed(testClass, new TestCompleteEvent(System.currentTimeMillis(), TestResult.ResultType.FAILURE));
         } else {
             remoteProcessor.processTestClass(testClass);

@@ -17,23 +17,27 @@ import org.gradle.internal.Factory;
 import org.gradle.internal.time.Clock;
 import org.gradle.internal.actor.ActorFactory;
 import org.gradle.internal.operations.BuildOperationExecutor;
+import org.gradle.internal.work.DefaultWorkerLeaseService;
+import org.gradle.internal.work.WorkerLeaseService;
 import org.gradle.process.internal.worker.WorkerProcessFactory;
 
-public class TestExecuter implements org.gradle.api.internal.tasks.testing.TestExecuter<JvmTestExecutionSpec>
+public class TestExecutor implements org.gradle.api.internal.tasks.testing.TestExecuter<JvmTestExecutionSpec>
 {
     private final WorkerProcessFactory workerFactory;
     private final ActorFactory actorFactory;
     private final ModuleRegistry moduleRegistry;
     private final BuildOperationExecutor buildOperationExecutor;
+    private final WorkerLeaseService workerLeaseService;
     private final Clock clock;
     private TestClassProcessor processor;
 
-    public TestExecuter(WorkerProcessFactory workerFactory, ActorFactory actorFactory, ModuleRegistry moduleRegistry, BuildOperationExecutor buildOperationExecutor, Clock clock) {
+    public TestExecutor(WorkerProcessFactory workerFactory, ActorFactory actorFactory, ModuleRegistry moduleRegistry, BuildOperationExecutor buildOperationExecutor, Clock clock, WorkerLeaseService workerLeaseService) {
         this.workerFactory = workerFactory;
         this.actorFactory = actorFactory;
         this.moduleRegistry = moduleRegistry;
         this.buildOperationExecutor = buildOperationExecutor;
         this.clock = clock;
+        this.workerLeaseService = workerLeaseService;
     }
 
     @Override
@@ -41,17 +45,11 @@ public class TestExecuter implements org.gradle.api.internal.tasks.testing.TestE
         final TestFramework testFramework = testExecutionSpec.getTestFramework();
         final WorkerTestClassProcessorFactory testInstanceFactory = testFramework.getProcessorFactory();
         final Set<File> classpath = ImmutableSet.copyOf(testExecutionSpec.getClasspath());
-        final Factory<TestClassProcessor> forkingProcessorFactory = new Factory<TestClassProcessor>() {
-            public TestClassProcessor create() {
-                return new ForkingTestClassProcessor(workerFactory, testInstanceFactory, testExecutionSpec.getJavaForkOptions(),
-                        classpath, testFramework.getWorkerConfigurationAction(), moduleRegistry);
-            }
-        };
-        Factory<TestClassProcessor> reforkingProcessorFactory = new Factory<TestClassProcessor>() {
-            public TestClassProcessor create() {
-                return new RestartEveryNTestClassProcessor(forkingProcessorFactory, testExecutionSpec.getForkEvery());
-            }
-        };
+        final Factory<TestClassProcessor> forkingProcessorFactory = () -> new ForkingTestClassProcessor(workerFactory, testInstanceFactory,
+                testExecutionSpec.getJavaForkOptions(),
+                classpath, testFramework.getWorkerConfigurationAction(), moduleRegistry);
+        Factory<TestClassProcessor> reforkingProcessorFactory = () -> new RestartEveryNTestClassProcessor(forkingProcessorFactory,
+                testExecutionSpec.getForkEvery());
 
         processor = new MaxNParallelTestClassProcessor(testExecutionSpec.getMaxParallelForks(),
                 reforkingProcessorFactory, actorFactory);
@@ -77,7 +75,7 @@ public class TestExecuter implements org.gradle.api.internal.tasks.testing.TestE
             testTaskOperationId = UUID.randomUUID();
         }
 
-        new TestMainAction(detector, processor, testResultProcessor, clock, testTaskOperationId, testExecutionSpec.getPath(), "Gradle Test Run " + testExecutionSpec.getIdentityPath()).run();
+        new TestMainAction(detector, processor, testResultProcessor, workerLeaseService, clock, testTaskOperationId,  "Gradle Test Run " + testExecutionSpec.getIdentityPath()).run();
     }
 
     public void stopNow() {

@@ -1,81 +1,76 @@
 plugins {
-  id "com.jfrog.bintray" version "1.8.4"
-  id "nu.studer.plugindev" version "1.0.6"
+  id "com.jfrog.bintray" version "1.8.5"
+  id "nu.studer.plugindev" version "4.1"
+  id 'groovy-gradle-plugin'
+  id 'java-gradle-plugin'
+  id 'com.gradle.plugin-publish' version '1.1.0'
+  id 'maven-publish'
 }
 
-group = 'com.pedjak.gradle.plugins'
-version = '0.5.10'
+//rootProject.name = "dockerized-test"
+group = 'com.github.pedjak.dockerized-test'
+version = '0.5.11'
 
 apply plugin: 'groovy'
-apply plugin: 'java-gradle-plugin'
 apply plugin: 'idea'
 
 dependencies {
-    compile gradleApi()
-    compile 'org.apache.commons:commons-lang3:3.3.2'
-    compile 'org.apache.maven:maven-artifact:3.3.3'
-    compile 'com.github.docker-java:docker-java:3.0.13'
+  implementation 'org.apache.commons:commons-lang3:3.12.0'
+  implementation 'org.apache.maven:maven-artifact:3.9.0'
+  implementation 'com.github.docker-java:docker-java:3.3.0'
 
-    testCompile ("org.spockframework:spock-core:1.0-groovy-2.4") {
-        exclude module: "groovy-all"
-    }
+  testImplementation("org.spockframework:spock-core:2.3-groovy-4.0") {
+    exclude module: "groovy-all"
+  }
 }
 
-plugindev {
-    pluginId "com.github.pedjak.dockerized-test"
-    pluginImplementationClass "com.pedjak.gradle.plugins.dockerizedtest.DockerizedTestPlugin"
-    pluginDescription "Running tests inside a docker image"
-    pluginLicenses "Apache-2.0"
-    pluginTags "docker", 'test', 'integration-test'
-    authorId "pedjak"
-    authorName "Predrag Knezevic"
-    authorEmail "pedjak@gmail.com"
-    projectUrl "https://github.com/pedjak/gradle-dockerized-test-plugin"
-    projectInceptionYear "2015"
-    done() // do not omit
-}
 
 javadoc {
-    options.addStringOption('Xdoclint:none', '-quiet')
+  options.addStringOption('Xdoclint:none', '-quiet')
 }
 
-bintray {
-    if (!project.hasProperty("BINTRAY_USER")) {
-        project.ext.BINTRAY_USER = ""
+gradlePlugin {
+  website = "https://github.com/uhla/gradle-dockerized-test-plugin"
+  vcsUrl = "https://github.com/uhla/gradle-dockerized-test-plugin.git"
+  plugins {
+    simplePlugin {
+      displayName = "dockerized-test"
+      description = "running tests in docker container"
+      tags.addAll("testing", "docker")
+      id = "com.github.pedjak.dockerized-test"
+      implementationClass = 'com.pedjak.gradle.plugins.dockerizedtest.DockerizedTestPlugin'
     }
-
-    if (!project.hasProperty("BINTRAY_API_KEY")) {
-        project.ext.BINTRAY_API_KEY = ""
-    }
-
-    user = BINTRAY_USER
-    key = BINTRAY_API_KEY
-
-    pkg.repo = "gradle-plugins"
-    pkg.userOrg = "pedjak"
-    pkg.attributes =  ["gradle-plugin": "${project.plugindev.pluginId}:${project.group}:${project.name}"]
-}
-
-afterEvaluate {
-    jar {
-        dependsOn generatePomFileForPluginPublication
-        metaInf {
-            from generatePomFileForPluginPublication.destination
-            into "maven/$project.group/$project.name"
-            rename {
-                'pom.xml'
-            }
-        }
-    }
+  }
 }
 
 sourceSets {
-    main {
-        java {
-            srcDirs = []
-        }
-        groovy {
-            srcDirs += ['src/main/java']
-        }
+  main {
+    java {
+      srcDirs = []
     }
+    groovy {
+      srcDirs += ['src/main/java']
+    }
+  }
 }
+
+
+publishing {
+  publications {
+    maven(MavenPublication) {
+      artifactId = 'com.github.pedjak.dockerized-test.gradle.plugin'
+      group = 'com.github.pedjak.dockerized-test'
+      version = '0.5.11'
+
+      from components.java
+    }
+  }
+}
+//publishing {
+//  repositories {
+//    maven {
+//      name = 'localPluginRepository'
+//      url = '../local-plugin-repository'
+//    }
+//  }
+//}
