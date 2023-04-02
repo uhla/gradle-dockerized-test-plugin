@@ -19,11 +19,11 @@ package com.pedjak.gradle.plugins.dockerizedtest
 import com.github.dockerjava.api.DockerClient
 import com.github.dockerjava.core.DefaultDockerClientConfig
 import com.github.dockerjava.core.DockerClientBuilder
+import com.github.dockerjava.httpclient5.ApacheDockerHttpClient
 import org.gradle.api.*
 import org.gradle.api.internal.file.FileCollectionFactory
 import org.gradle.api.internal.file.temp.TemporaryFileProvider
 import org.gradle.api.model.ObjectFactory
-import org.gradle.api.publish.tasks.GenerateModuleMetadata
 import org.gradle.initialization.DefaultBuildCancellationToken
 import org.gradle.internal.concurrent.DefaultExecutorFactory
 import org.gradle.internal.concurrent.ExecutorFactory
@@ -67,6 +67,8 @@ class DockerizedTestPlugin implements Plugin<Project> {
 
 //
 //        throw new RuntimeException()
+    println startParameter
+
     ext.volumes = ["$startParameter.gradleUserHomeDir": "$startParameter.gradleUserHomeDir",
                    "$project.projectDir"              : "$project.projectDir"]
     ext.user = currentUser
@@ -77,7 +79,7 @@ class DockerizedTestPlugin implements Plugin<Project> {
 //                println("XXXXXXXX" + test)
 //                println("XXXXXXXX" + services.get(FileCollectionFactory).toString())
         workerSemaphore.applyTo(test.project)
-        test.testExecuter = new TestExecutor(newProcessBuilderFactory(project, extension, test.processBuilderFactory, startParameter.gradleUserHomeDir, services), actorFactory, moduleRegistry, services.get(BuildOperationExecutor), services.get(Clock), services.get(WorkerLeaseService));
+        test.testExecuter = new TestExecuter(newProcessBuilderFactory(project, extension, test.processBuilderFactory, startParameter.gradleUserHomeDir, services), actorFactory, moduleRegistry, services.get(BuildOperationExecutor), services.get(Clock), services.get(WorkerLeaseService));
 
         if (!extension.client) {
           extension.client = createDefaultClient()
@@ -89,6 +91,7 @@ class DockerizedTestPlugin implements Plugin<Project> {
 
   static DockerClient createDefaultClient() {
     DockerClientBuilder.getInstance(DefaultDockerClientConfig.createDefaultConfigBuilder().build())
+    .withDockerHttpClient(new ApacheDockerHttpClient.Builder().dockerHost(URI.create("unix:///var/run/docker.sock")).build())
     // TODO?
 //                    .withDockerCmdExecFactory(new DockerHttpClient()new NettyDockerCmdExecFactory())
         .build()

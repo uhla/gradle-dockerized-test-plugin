@@ -88,6 +88,9 @@ public class ForkingTestClassProcessor implements TestClassProcessor
         options.copyTo(builder.getJavaCommand());
         buildConfigAction.execute(builder);
 
+//        System.out.println("\n\nForkingProcessor 11111: " + getTestWorkerImplementationClasspath());
+//        classPath.iterator().forEachRemaining(System.out::println);
+//        System.out.println("JAVA CMD" + builder.getJavaCommand());
         workerProcess = builder.build();
         workerProcess.start();
 
@@ -104,14 +107,21 @@ public class ForkingTestClassProcessor implements TestClassProcessor
         return CollectionUtils.flattenCollections(URL.class,
                 moduleRegistry.getModule("gradle-core-api").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getModule("gradle-core").getImplementationClasspath().getAsURLs(),
+                moduleRegistry.getModule("gradle-logging-api").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getModule("gradle-logging").getImplementationClasspath().getAsURLs(),
+                moduleRegistry.getModule("gradle-enterprise-logging").getImplementationClasspath().getAsURLs(),
+                moduleRegistry.getModule("gradle-build-operations").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getModule("gradle-messaging").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getModule("gradle-base-services").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getModule("gradle-cli").getImplementationClasspath().getAsURLs(),
+                moduleRegistry.getModule("gradle-files").getImplementationClasspath().getAsURLs(),
+                moduleRegistry.getModule("gradle-file-temp").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getModule("gradle-native").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getModule("gradle-testing-base").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getModule("gradle-testing-jvm").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getModule("gradle-process-services").getImplementationClasspath().getAsURLs(),
+                moduleRegistry.getModule("gradle-enterprise-workers").getImplementationClasspath().getAsURLs(),
+                moduleRegistry.getModule("gradle-worker-processes").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getExternalModule("slf4j-api").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getExternalModule("jul-to-slf4j").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getExternalModule("native-platform").getImplementationClasspath().getAsURLs(),

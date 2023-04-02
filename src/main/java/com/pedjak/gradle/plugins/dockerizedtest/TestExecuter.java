@@ -2,9 +2,12 @@ package com.pedjak.gradle.plugins.dockerizedtest;
 
 import java.io.File;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import com.google.common.collect.ImmutableSet;
 
+import org.glassfish.jersey.internal.guava.Sets;
 import org.gradle.api.file.FileTree;
 import org.gradle.api.internal.classpath.ModuleRegistry;
 import org.gradle.api.internal.tasks.testing.*;
@@ -17,11 +20,10 @@ import org.gradle.internal.Factory;
 import org.gradle.internal.time.Clock;
 import org.gradle.internal.actor.ActorFactory;
 import org.gradle.internal.operations.BuildOperationExecutor;
-import org.gradle.internal.work.DefaultWorkerLeaseService;
 import org.gradle.internal.work.WorkerLeaseService;
 import org.gradle.process.internal.worker.WorkerProcessFactory;
 
-public class TestExecutor implements org.gradle.api.internal.tasks.testing.TestExecuter<JvmTestExecutionSpec>
+public class TestExecuter implements org.gradle.api.internal.tasks.testing.TestExecuter<JvmTestExecutionSpec>
 {
     private final WorkerProcessFactory workerFactory;
     private final ActorFactory actorFactory;
@@ -31,7 +33,7 @@ public class TestExecutor implements org.gradle.api.internal.tasks.testing.TestE
     private final Clock clock;
     private TestClassProcessor processor;
 
-    public TestExecutor(WorkerProcessFactory workerFactory, ActorFactory actorFactory, ModuleRegistry moduleRegistry, BuildOperationExecutor buildOperationExecutor, Clock clock, WorkerLeaseService workerLeaseService) {
+    public TestExecuter(WorkerProcessFactory workerFactory, ActorFactory actorFactory, ModuleRegistry moduleRegistry, BuildOperationExecutor buildOperationExecutor, Clock clock, WorkerLeaseService workerLeaseService) {
         this.workerFactory = workerFactory;
         this.actorFactory = actorFactory;
         this.moduleRegistry = moduleRegistry;
@@ -44,7 +46,8 @@ public class TestExecutor implements org.gradle.api.internal.tasks.testing.TestE
     public void execute(final JvmTestExecutionSpec testExecutionSpec, TestResultProcessor testResultProcessor) {
         final TestFramework testFramework = testExecutionSpec.getTestFramework();
         final WorkerTestClassProcessorFactory testInstanceFactory = testFramework.getProcessorFactory();
-        final Set<File> classpath = ImmutableSet.copyOf(testExecutionSpec.getClasspath());
+  final Set<File> classpath = ImmutableSet.copyOf(testExecutionSpec.getClasspath());
+
         final Factory<TestClassProcessor> forkingProcessorFactory = () -> new ForkingTestClassProcessor(workerFactory, testInstanceFactory,
                 testExecutionSpec.getJavaForkOptions(),
                 classpath, testFramework.getWorkerConfigurationAction(), moduleRegistry);
@@ -58,11 +61,13 @@ public class TestExecutor implements org.gradle.api.internal.tasks.testing.TestE
 
         Runnable detector;
         if (testExecutionSpec.isScanForTestClasses() && testFramework.getDetector() != null) {
+            System.out.println(" 55555555555 testFramework detector");
             TestFrameworkDetector testFrameworkDetector = testExecutionSpec.getTestFramework().getDetector();
             testFrameworkDetector.setTestClasses(testExecutionSpec.getTestClassesDirs().getFiles());
             testFrameworkDetector.setTestClasspath(classpath);
             detector = new DefaultTestClassScanner(testClassFiles, testFrameworkDetector, processor);
         } else {
+            System.out.println(" 66666666666 testFramework no detector");
             detector = new DefaultTestClassScanner(testClassFiles, null, processor);
         }
 

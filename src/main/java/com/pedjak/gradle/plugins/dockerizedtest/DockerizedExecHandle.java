@@ -16,6 +16,7 @@
 
 package com.pedjak.gradle.plugins.dockerizedtest;
 
+import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.command.WaitContainerResultCallback;
 import com.github.dockerjava.core.command.AttachContainerResultCallback;
 import com.google.common.base.Joiner;
@@ -24,7 +25,9 @@ import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.model.*;
 import com.github.dockerjava.core.util.CompressArchiveUtil;
+
 import groovy.lang.Closure;
+
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 import org.gradle.initialization.BuildCancellationToken;
@@ -36,6 +39,7 @@ import org.gradle.process.internal.*;
 import org.gradle.process.internal.shutdown.ShutdownHooks;
 
 import javax.annotation.Nullable;
+
 import java.io.*;
 import java.nio.file.Files;
 import java.util.*;
@@ -59,15 +63,14 @@ import static java.lang.String.format;
  *   <li>INIT -> FAILED</li>
  *   <li>INIT -> STARTED -> DETACHED -> ABORTED</li>
  * </ul>
- *
+ * <p>
  * State is controlled on all control methods:
  * <ul>
  * <li>{@link #start()} allowed when state is INIT</li>
  * <li>{@link #abort()} allowed when state is STARTED or DETACHED</li>
  * </ul>
  */
-public class DockerizedExecHandle implements ExecHandle, ProcessSettings
-{
+public class DockerizedExecHandle implements ExecHandle, ProcessSettings {
 
     private static final Logger LOGGER = Logging.getLogger(DockerizedExecHandle.class);
 
@@ -127,9 +130,9 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
     private final DockerizedTestExtension testExtension;
 
     public DockerizedExecHandle(DockerizedTestExtension testExtension, String displayName, File directory, String command, List<String> arguments,
-                      Map<String, String> environment, StreamsHandler outputHandler, StreamsHandler inputHandler,
-                      List<ExecHandleListener> listeners, boolean redirectErrorStream, int timeoutMillis, boolean daemon,
-                      Executor executor, BuildCancellationToken buildCancellationToken) {
+                                Map<String, String> environment, StreamsHandler outputHandler, StreamsHandler inputHandler,
+                                List<ExecHandleListener> listeners, boolean redirectErrorStream, int timeoutMillis, boolean daemon,
+                                Executor executor, BuildCancellationToken buildCancellationToken) {
         this.displayName = displayName;
         this.directory = directory;
         this.command = command;
@@ -147,7 +150,7 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
         this.buildCancellationToken = buildCancellationToken;
         this.testExtension = testExtension;
         shutdownHookAction = new ExecHandleShutdownHookAction(this);
-        broadcast = new ListenerBroadcast<ExecHandleListener>(ExecHandleListener.class);
+        broadcast = new ListenerBroadcast<>(ExecHandleListener.class);
         broadcast.addAll(listeners);
     }
 
@@ -239,14 +242,14 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
     @Nullable
     private ExecException execExceptionFor(Throwable failureCause, ExecHandleState currentState) {
         return failureCause != null
-            ? new ExecException(failureMessageFor(currentState), failureCause)
-            : null;
+                ? new ExecException(failureMessageFor(currentState), failureCause)
+                : null;
     }
 
     private String failureMessageFor(ExecHandleState currentState) {
         return currentState == ExecHandleState.STARTING
-            ? format("A problem occurred starting process '%s'", displayName)
-            : format("A problem occurred waiting for process '%s' to complete.", displayName);
+                ? format("A problem occurred starting process '%s'", displayName)
+                : format("A problem occurred waiting for process '%s' to complete.", displayName);
     }
 
     public ExecHandle start() {
@@ -270,7 +273,7 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
                 try {
                     if (!stateChanged.await(30, TimeUnit.SECONDS)) {
                         execHandleRunner.abortProcess();
-                        throw new RuntimeException("Giving up on "+execHandleRunner);
+                        throw new RuntimeException("Giving up on " + execHandleRunner);
                     }
                 } catch (InterruptedException e) {
                     //ok, wrapping up
@@ -296,7 +299,7 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
             }
             if (!stateIn(ExecHandleState.STARTED, ExecHandleState.DETACHED)) {
                 throw new IllegalStateException(
-                    format("Cannot abort process '%s' because it is not in started or detached state", displayName));
+                        format("Cannot abort process '%s' because it is not in started or detached state", displayName));
             }
             this.execHandleRunner.abortProcess();
             this.waitForFinish();
@@ -388,38 +391,10 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
         return timeoutMillis;
     }
 
-    private void maybeCopyJvmOptionFile(String containerId, DockerClient client) throws Exception {
-        for (String arg: arguments) {
-            if (arg.startsWith("@")) {
-                File optionFile = new File(arg.substring(1));
-                if (optionFile.isFile()) {
-                    boolean copyingDone = false;
-                    File tar = CompressArchiveUtil.archiveTARFiles(new File("/"), Collections.singletonList(optionFile), optionFile.getName());
-                    for (int i = 0; i < 10; i++)
-                    {
-                        try (FileInputStream tarInputStream = new FileInputStream(tar)) {
-                            client.copyArchiveToContainerCmd(containerId)
-                                    .withRemotePath("/")
-                                    .withTarInputStream(tarInputStream)
-                                    .exec();
-                            copyingDone = true;
-                            Files.deleteIfExists(tar.toPath());
-                            break;
-                        } catch (Exception e) {
-                            LOGGER.warn("Failed copying option file {} via tar {} to container {}", optionFile, tar, containerId, e);
-                        }
-                    }
-                    if (!copyingDone) {
-                        throw new IOException(String.format("Error copying option file %s to container %s", optionFile, containerId));
-                    }
-                }
-            }
-        }
-    }
+
 
     public Process runContainer() {
-        try
-        {
+        try {
             DockerClient client = testExtension.getClient();
             CreateContainerCmd createCmd = client.createContainerCmd(testExtension.getImage())
                     .withTty(false)
@@ -427,16 +402,25 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
                     .withStdInOnce(true)
                     .withWorkingDir(directory.getAbsolutePath());
 
-            createCmd.withEnv(getEnv());
-
+            // FIXME this does not allow to run java
+            //            createCmd.withEnv(getEnv());
+            //            System.out.println("ENVIRONMENT:  " + getEnv());
+            //
             String user = testExtension.getUser();
-            if (user != null)
+            if (user != null) {
                 createCmd.withUser(user);
+            }
             bindVolumes(createCmd);
-            List<String> cmdLine = new ArrayList<String>();
+            List<String> cmdLine = new ArrayList<>();
+            //            cmdLine.add("java");
+            //            cmdLine.add("");
             cmdLine.add(command);
             cmdLine.addAll(arguments);
+            //            cmdLine.add("while true;do sleep 1000;done");
             createCmd.withCmd(cmdLine);
+
+            // TODO debug
+//            System.out.println(createCmd);
 
             invokeIfNotNull(testExtension.getBeforeContainerCreate(), createCmd, client);
             String containerId = createCmd.exec().getId();
@@ -446,17 +430,57 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
             maybeCopyJvmOptionFile(containerId, client);
 
             invokeIfNotNull(testExtension.getBeforeContainerStart(), containerId, client);
+//            final InspectContainerResponse.ContainerState state1 = client.inspectContainerCmd(containerId).exec().getState();
+//            System.out.println(state1.toString());
+
             client.startContainerCmd(containerId).exec();
+            client.attachContainerCmd(containerId).start().awaitCompletion();
+            // debug stuff TODO remove
+//            final InspectContainerResponse.ContainerState state2 = client.inspectContainerCmd(containerId).exec().getState();
+//            System.out.println(state2.toString());
+
             invokeIfNotNull(testExtension.getAfterContainerStart(), containerId, client);
 
             if (Boolean.FALSE.equals(client.inspectContainerCmd(containerId).exec().getState().getRunning())) {
-                throw new RuntimeException("Container "+containerId+" not running!");
+                throw new RuntimeException("Container " + containerId + " not running!");
             }
 
             return new DockerizedProcess(client, containerId, testExtension.getAfterContainerStop());
         } catch (Exception e) {
             LOGGER.error("Failed to create container " + displayName, new RuntimeException(e));
             throw new RuntimeException(e);
+        }
+    }
+
+    private void maybeCopyJvmOptionFile(String containerId, DockerClient client) throws Exception {
+        for (String arg : arguments) {
+            if (arg.startsWith("@")) {
+                System.out.println(arg);
+                File optionFile = new File(arg.substring(1));
+                if (optionFile.isFile()) {
+                    boolean copyingDone = false;
+                    File tar = CompressArchiveUtil.archiveTARFiles(new File("/"), Collections.singletonList(optionFile), optionFile.getName());
+                    System.out.println("TAR: " + tar.toString());
+                    try (FileInputStream tarInputStream = new FileInputStream(tar)) {
+                        client.copyArchiveToContainerCmd(containerId)
+                                .withRemotePath("/")
+                                .withTarInputStream(tarInputStream)
+                                .exec();
+                        copyingDone = true;
+                        System.out.println("TAR: copy done");
+                        Files.deleteIfExists(tar.toPath());
+                        break;
+                    } catch (Exception e) {
+                        System.out.println("bb");
+                        LOGGER.warn("Failed copying option file {} via tar {} to container {}", optionFile, tar, containerId, e);
+                    }
+
+                    if (!copyingDone) {
+                        System.out.println("aa");
+                        throw new IOException(String.format("Error copying option file %s to container %s", optionFile, containerId));
+                    }
+                }
+            }
         }
     }
 
@@ -473,10 +497,11 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
             closure.call(nargs);
         }
     }
+
     private List<String> getEnv() {
-        List<String> env = new ArrayList<String>();
-        for (Map.Entry<String, String> e: environment.entrySet()) {
-            env.add(e.getKey()+"="+e.getValue());
+        List<String> env = new ArrayList<>();
+        for (Map.Entry<String, String> e : environment.entrySet()) {
+            env.add(e.getKey() + "=" + e.getValue());
         }
         return env;
     }
@@ -511,9 +536,9 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
 
         public ExecResult assertNormalExitValue() throws ExecException {
             // all exit values are ok
-//            if (exitValue != 0) {
-//                throw new ExecException(format("Process '%s' finished with non-zero exit value %d", displayName, exitValue));
-//            }
+            if (exitValue != 0) {
+                throw new ExecException(format("Process '%s' finished with non-zero exit value %d", displayName, exitValue));
+            }
             return this;
         }
 
@@ -572,12 +597,10 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
         private final CountDownLatch finished = new CountDownLatch(1);
         private final AtomicInteger exitCode = new AtomicInteger();
         private final AttachContainerResultCallback attachContainerResultCallback = new AttachContainerResultCallback() {
-            @Override public void onNext(Frame frame)
-            {
-                try
-                {
-                    if (frame.getStreamType().equals(StreamType.STDOUT))
-                    {
+            @Override
+            public void onNext(Frame frame) {
+                try {
+                    if (frame.getStreamType().equals(StreamType.STDOUT)) {
                         stdOutWriteStream.write(frame.getPayload());
                     } else if (frame.getStreamType().equals(StreamType.STDERR)) {
                         stdErrWriteStream.write(frame.getPayload());
@@ -590,37 +613,31 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
         };
 
         private final WaitContainerResultCallback waitContainerResultCallback = new WaitContainerResultCallback() {
-            @Override public void onNext(WaitResponse waitResponse)
-            {
+            @Override
+            public void onNext(WaitResponse waitResponse) {
                 exitCode.set(waitResponse.getStatusCode());
-                try
-                {
+                try {
                     attachContainerResultCallback.close();
                     attachContainerResultCallback.awaitCompletion();
                     stdOutWriteStream.close();
                     stdErrWriteStream.close();
                 } catch (Exception e) {
                     LOGGER.debug("Error by detaching streams", e);
-                } finally
-                {
-                    try
-                    {
+                } finally {
+                    try {
                         invokeIfNotNull(afterContainerStop, containerId, dockerClient);
                     } catch (Exception e) {
                         LOGGER.debug("Exception thrown at invoking afterContainerStop", e);
-                    } finally
-                    {
+                    } finally {
                         finished.countDown();
                     }
 
                 }
 
-
             }
         };
 
-        public DockerizedProcess(final DockerClient dockerClient, final String containerId, final Closure afterContainerStop) throws Exception
-        {
+        public DockerizedProcess(final DockerClient dockerClient, final String containerId, final Closure afterContainerStop) throws Exception {
             this.dockerClient = dockerClient;
             this.containerId = containerId;
             this.afterContainerStop = afterContainerStop;
@@ -637,46 +654,48 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings
                     .withStdIn(stdInReadStream)
                     .exec(attachContainerResultCallback);
             if (!attachContainerResultCallback.awaitStarted(10, TimeUnit.SECONDS)) {
-                LOGGER.warn("Not attached to container "+containerId+" within 10secs");
-                throw new RuntimeException("Not attached to container "+containerId+" within 10secs");
+                LOGGER.warn("Not attached to container " + containerId + " within 10secs");
+                throw new RuntimeException("Not attached to container " + containerId + " within 10secs");
             }
         }
 
-        @Override public OutputStream getOutputStream()
-        {
+        @Override
+        public OutputStream getOutputStream() {
             return stdInWriteStream;
         }
 
-        @Override public InputStream getInputStream()
-        {
+        @Override
+        public InputStream getInputStream() {
             return stdOutReadStream;
         }
 
-        @Override public InputStream getErrorStream()
-        {
+        @Override
+        public InputStream getErrorStream() {
             return stdErrReadStream;
         }
 
-        @Override public int waitFor() throws InterruptedException
-        {
+        @Override
+        public int waitFor() throws InterruptedException {
             finished.await();
             return exitCode.get();
         }
 
-        @Override public int exitValue()
-        {
-            if (finished.getCount() > 0) throw new IllegalThreadStateException("docker process still running");
+        @Override
+        public int exitValue() {
+            if (finished.getCount() > 0) {
+                throw new IllegalThreadStateException("docker process still running");
+            }
             return exitCode.get();
         }
 
-        @Override public void destroy()
-        {
+        @Override
+        public void destroy() {
             dockerClient.killContainerCmd(containerId).exec();
         }
 
         @Override
         public String toString() {
-            return "Container "+containerId+" on "+dockerClient.toString();
+            return "Container " + containerId + " on " + dockerClient.toString();
         }
     }
 

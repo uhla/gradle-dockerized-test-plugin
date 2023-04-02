@@ -58,9 +58,10 @@ class DockerizedJavaExecHandleBuilder extends JavaExecHandleBuilder {
     }
 
     ExecHandle build() {
-
+        println "====CPATH: " + getEffectiveArguments()
         return new ExitCodeTolerantExecHandle(new DockerizedExecHandle(extension, getDisplayName(),
                                                                     getWorkingDir(),
+            // TODO change back to java
                                                                     'java',
                                                                     allArguments,
                                                                     getActualEnvironment(),
