@@ -40,16 +40,18 @@ class ExitCodeTolerantExecHandle implements ExecHandle {
 
             @Override
             void beforeExecutionStarted(final ExecHandle execHandle) {
-
+                println "before execution started"
             }
 
             @Override
             void executionStarted(ExecHandle execHandle) {
+                println "execution started"
                 // do nothing
             }
 
             @Override
             void executionFinished(ExecHandle execHandle, ExecResult execResult) {
+                println "execution finished"
                 synchronized (delegate) {
                     if (needsReleasing) {
                         testWorkerSemaphore.release()

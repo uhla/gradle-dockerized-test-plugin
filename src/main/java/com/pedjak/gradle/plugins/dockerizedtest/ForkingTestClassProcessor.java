@@ -88,9 +88,6 @@ public class ForkingTestClassProcessor implements TestClassProcessor
         options.copyTo(builder.getJavaCommand());
         buildConfigAction.execute(builder);
 
-//        System.out.println("\n\nForkingProcessor 11111: " + getTestWorkerImplementationClasspath());
-//        classPath.iterator().forEachRemaining(System.out::println);
-//        System.out.println("JAVA CMD" + builder.getJavaCommand());
         workerProcess = builder.build();
         workerProcess.start();
 
@@ -122,12 +119,16 @@ public class ForkingTestClassProcessor implements TestClassProcessor
                 moduleRegistry.getModule("gradle-process-services").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getModule("gradle-enterprise-workers").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getModule("gradle-worker-processes").getImplementationClasspath().getAsURLs(),
+                moduleRegistry.getModule("gradle-worker-services").getImplementationClasspath().getAsURLs(),
+                moduleRegistry.getModule("gradle-testing-junit-platform").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getExternalModule("slf4j-api").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getExternalModule("jul-to-slf4j").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getExternalModule("native-platform").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getExternalModule("kryo").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getExternalModule("commons-lang").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getExternalModule("junit").getImplementationClasspath().getAsURLs(),
+                moduleRegistry.getExternalModule("junit-platform-launcher").getImplementationClasspath().getAsURLs(),
+//                moduleRegistry.getExternalModule("junit5").getImplementationClasspath().getAsURLs(),
                 ForkingTestClassProcessor.class.getProtectionDomain().getCodeSource().getLocation()
         );
     }

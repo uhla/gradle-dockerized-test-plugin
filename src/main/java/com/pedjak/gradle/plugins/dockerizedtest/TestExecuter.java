@@ -23,8 +23,7 @@ import org.gradle.internal.operations.BuildOperationExecutor;
 import org.gradle.internal.work.WorkerLeaseService;
 import org.gradle.process.internal.worker.WorkerProcessFactory;
 
-public class TestExecuter implements org.gradle.api.internal.tasks.testing.TestExecuter<JvmTestExecutionSpec>
-{
+public class TestExecuter implements org.gradle.api.internal.tasks.testing.TestExecuter<JvmTestExecutionSpec> {
     private final WorkerProcessFactory workerFactory;
     private final ActorFactory actorFactory;
     private final ModuleRegistry moduleRegistry;
@@ -33,7 +32,8 @@ public class TestExecuter implements org.gradle.api.internal.tasks.testing.TestE
     private final Clock clock;
     private TestClassProcessor processor;
 
-    public TestExecuter(WorkerProcessFactory workerFactory, ActorFactory actorFactory, ModuleRegistry moduleRegistry, BuildOperationExecutor buildOperationExecutor, Clock clock, WorkerLeaseService workerLeaseService) {
+    public TestExecuter(WorkerProcessFactory workerFactory, ActorFactory actorFactory, ModuleRegistry moduleRegistry,
+                        BuildOperationExecutor buildOperationExecutor, Clock clock, WorkerLeaseService workerLeaseService) {
         this.workerFactory = workerFactory;
         this.actorFactory = actorFactory;
         this.moduleRegistry = moduleRegistry;
@@ -46,7 +46,7 @@ public class TestExecuter implements org.gradle.api.internal.tasks.testing.TestE
     public void execute(final JvmTestExecutionSpec testExecutionSpec, TestResultProcessor testResultProcessor) {
         final TestFramework testFramework = testExecutionSpec.getTestFramework();
         final WorkerTestClassProcessorFactory testInstanceFactory = testFramework.getProcessorFactory();
-  final Set<File> classpath = ImmutableSet.copyOf(testExecutionSpec.getClasspath());
+        final Set<File> classpath = ImmutableSet.copyOf(testExecutionSpec.getClasspath());
 
         final Factory<TestClassProcessor> forkingProcessorFactory = () -> new ForkingTestClassProcessor(workerFactory, testInstanceFactory,
                 testExecutionSpec.getJavaForkOptions(),
@@ -73,14 +73,14 @@ public class TestExecuter implements org.gradle.api.internal.tasks.testing.TestE
 
         Object testTaskOperationId;
 
-        try
-        {
+        try {
             testTaskOperationId = buildOperationExecutor.getCurrentOperation().getParentId();
         } catch (Exception e) {
             testTaskOperationId = UUID.randomUUID();
         }
 
-        new TestMainAction(detector, processor, testResultProcessor, workerLeaseService, clock, testTaskOperationId,  "Gradle Test Run " + testExecutionSpec.getIdentityPath()).run();
+        new TestMainAction(detector, processor, testResultProcessor, workerLeaseService, clock, testTaskOperationId,
+                "Gradle Test Run " + testExecutionSpec.getIdentityPath()).run();
     }
 
     public void stopNow() {

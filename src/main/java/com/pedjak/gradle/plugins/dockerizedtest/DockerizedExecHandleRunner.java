@@ -75,6 +75,7 @@ public class DockerizedExecHandleRunner implements Runnable {
                 completed(exitValue);
             }
         } catch (Throwable t) {
+            // TODO verify to make sure everything is removed when failed
             execHandle.failed(t);
         }
     }

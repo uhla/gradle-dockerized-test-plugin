@@ -23,6 +23,7 @@ dependencies {
   testImplementation("org.spockframework:spock-core:2.3-groovy-4.0") {
     exclude module: "groovy-all"
   }
+//  testImplementation('org.junit.jupiter:junit-jupiter-api:5.9.2')
 }
 
 
@@ -66,6 +67,10 @@ publishing {
       from components.java
     }
   }
+}
+
+repositories {
+  mavenCentral()
 }
 //publishing {
 //  repositories {

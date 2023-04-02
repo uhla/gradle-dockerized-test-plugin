@@ -264,7 +264,12 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings {
                 throw new IllegalStateException(format("Cannot start process '%s' because it has already been started", displayName));
             }
             setState(ExecHandleState.STARTING);
-
+            // TODO test sleep
+//            try {
+//                Thread.sleep(20000);
+//            } catch (InterruptedException e) {
+//                throw new RuntimeException(e);
+//            }
             execHandleRunner = new DockerizedExecHandleRunner(this, new CompositeStreamsHandler(), executor);
             executor.execute(new CurrentBuildOperationPreservingRunnable(execHandleRunner));
 
@@ -285,6 +290,8 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings {
             }
 
             LOGGER.info("Successfully started process '{}'", displayName);
+
+
         } finally {
             lock.unlock();
         }
@@ -400,7 +407,8 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings {
                     .withTty(false)
                     .withStdinOpen(true)
                     .withStdInOnce(true)
-                    .withWorkingDir(directory.getAbsolutePath());
+                    .withWorkingDir(directory.getAbsolutePath())
+                    .withNetworkMode("host"); // TODO hm?
 
             // FIXME this does not allow to run java
             //            createCmd.withEnv(getEnv());
@@ -455,28 +463,23 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings {
     private void maybeCopyJvmOptionFile(String containerId, DockerClient client) throws Exception {
         for (String arg : arguments) {
             if (arg.startsWith("@")) {
-                System.out.println(arg);
                 File optionFile = new File(arg.substring(1));
                 if (optionFile.isFile()) {
                     boolean copyingDone = false;
                     File tar = CompressArchiveUtil.archiveTARFiles(new File("/"), Collections.singletonList(optionFile), optionFile.getName());
-                    System.out.println("TAR: " + tar.toString());
                     try (FileInputStream tarInputStream = new FileInputStream(tar)) {
                         client.copyArchiveToContainerCmd(containerId)
                                 .withRemotePath("/")
                                 .withTarInputStream(tarInputStream)
                                 .exec();
                         copyingDone = true;
-                        System.out.println("TAR: copy done");
                         Files.deleteIfExists(tar.toPath());
                         break;
                     } catch (Exception e) {
-                        System.out.println("bb");
                         LOGGER.warn("Failed copying option file {} via tar {} to container {}", optionFile, tar, containerId, e);
                     }
 
                     if (!copyingDone) {
-                        System.out.println("aa");
                         throw new IOException(String.format("Error copying option file %s to container %s", optionFile, containerId));
                     }
                 }

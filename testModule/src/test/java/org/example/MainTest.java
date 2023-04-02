@@ -11,6 +11,6 @@ public class MainTest {
 
 //    Thread.sleep(5000);
 //    throw new RuntimeException();
-        assert Main.add(3,4) == 7;
+        assert Main.add(3,4) != 7;
     }
 }

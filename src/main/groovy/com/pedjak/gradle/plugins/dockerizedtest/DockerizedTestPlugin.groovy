@@ -39,6 +39,7 @@ import org.gradle.internal.remote.internal.IncomingConnector
 import org.apache.commons.lang3.SystemUtils
 import org.apache.maven.artifact.versioning.ComparableVersion
 import org.gradle.internal.remote.internal.hub.MessageHubBackedObjectConnection
+import org.gradle.internal.remote.internal.inet.InetAddressFactory
 import org.gradle.internal.remote.internal.inet.MultiChoiceAddress
 import org.gradle.internal.time.Clock
 import org.gradle.internal.work.WorkerLeaseService
@@ -52,13 +53,32 @@ class DockerizedTestPlugin implements Plugin<Project> {
   def supportedVersion = '7.6'
   def currentUser
   def messagingServer
+  def addressFactory
   def static workerSemaphore = new DefaultWorkerSemaphore()
   def memoryManager = new NoMemoryManager()
 
   @Inject
-  DockerizedTestPlugin(MessagingServer messagingServer) {
+  DockerizedTestPlugin(MessagingServer messagingServer, InetAddressFactory addressFactory) {
     this.currentUser = SystemUtils.IS_OS_WINDOWS ? "0" : "id -u".execute().text.trim()
     this.messagingServer = new MessageServer(messagingServer.connector, messagingServer.executorFactory)
+    this.addressFactory = new InetAddressFactoryWildcardDelegate(addressFactory)
+  }
+
+  // just crazy attempt to override TODO eventually remove
+  class InetAddressFactoryWildcardDelegate extends InetAddressFactory {
+
+    @Delegate
+    final InetAddressFactory delegate
+
+    InetAddressFactoryWildcardDelegate(InetAddressFactory delegate) {
+      this.delegate = delegate;
+    }
+
+    InetAddress getLocalBindingAddress(){
+      println("Hello there!")
+      getWildcardBindingAddress()
+    }
+
   }
 
   void configureTest(project, test) {
@@ -67,7 +87,7 @@ class DockerizedTestPlugin implements Plugin<Project> {
 
 //
 //        throw new RuntimeException()
-    println startParameter
+
 
     ext.volumes = ["$startParameter.gradleUserHomeDir": "$startParameter.gradleUserHomeDir",
                    "$project.projectDir"              : "$project.projectDir"]
@@ -90,8 +110,9 @@ class DockerizedTestPlugin implements Plugin<Project> {
   }
 
   static DockerClient createDefaultClient() {
-    DockerClientBuilder.getInstance(DefaultDockerClientConfig.createDefaultConfigBuilder().build())
-    .withDockerHttpClient(new ApacheDockerHttpClient.Builder().dockerHost(URI.create("unix:///var/run/docker.sock")).build())
+    DockerClientBuilder.getInstance(DefaultDockerClientConfig.createDefaultConfigBuilder()
+        .withDockerHost("unix:///var/run/docker.sock").build())
+        .withDockerHttpClient(new ApacheDockerHttpClient.Builder().dockerHost(URI.create("unix:///var/run/docker.sock")).build())
     // TODO?
 //                    .withDockerCmdExecFactory(new DockerHttpClient()new NettyDockerCmdExecFactory())
         .build()
@@ -174,7 +195,7 @@ class DockerizedTestPlugin implements Plugin<Project> {
     MultiChoiceAddress address
 
     @Delegate
-    ConnectionAcceptor delegate
+    final ConnectionAcceptor delegate
 
     ConnectionAcceptorDelegate(ConnectionAcceptor delegate) {
       this.delegate = delegate
@@ -183,11 +204,18 @@ class DockerizedTestPlugin implements Plugin<Project> {
     Address getAddress() {
       synchronized (delegate) {
         if (address == null) {
+
           def remoteAddresses = NetworkInterface.networkInterfaces.findAll { it.up && !it.loopback }*.inetAddresses*.collect { it }.flatten()
+//          remoteAddresses.add(InetAddress.getByName("host.docker.internal"))
+//          println "REMOTEEEEEE:" + remoteAddresses
+          println "ADDR " + delegate.address.canonicalAddress
+          println "PORT " + delegate.address.port
+          remoteAddresses.add(InetAddress.getByName("eopng-test-master"))
           def original = delegate.address
           address = new MultiChoiceAddress(original.canonicalAddress, original.port, remoteAddresses)
         }
       }
+
       address
     }
   }
