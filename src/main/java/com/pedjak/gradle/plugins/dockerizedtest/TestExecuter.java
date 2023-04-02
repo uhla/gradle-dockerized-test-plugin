@@ -61,13 +61,11 @@ public class TestExecuter implements org.gradle.api.internal.tasks.testing.TestE
 
         Runnable detector;
         if (testExecutionSpec.isScanForTestClasses() && testFramework.getDetector() != null) {
-            System.out.println(" 55555555555 testFramework detector");
             TestFrameworkDetector testFrameworkDetector = testExecutionSpec.getTestFramework().getDetector();
             testFrameworkDetector.setTestClasses(testExecutionSpec.getTestClassesDirs().getFiles());
             testFrameworkDetector.setTestClasspath(classpath);
             detector = new DefaultTestClassScanner(testClassFiles, testFrameworkDetector, processor);
         } else {
-            System.out.println(" 66666666666 testFramework no detector");
             detector = new DefaultTestClassScanner(testClassFiles, null, processor);
         }
 

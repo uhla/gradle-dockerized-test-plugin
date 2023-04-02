@@ -29,6 +29,7 @@ import org.gradle.internal.concurrent.DefaultExecutorFactory
 import org.gradle.internal.concurrent.ExecutorFactory
 import org.gradle.api.tasks.testing.Test
 import org.gradle.internal.file.PathToFileResolver
+import org.gradle.internal.id.UUIDGenerator
 import org.gradle.internal.operations.BuildOperationExecutor;
 import org.gradle.internal.remote.Address
 import org.gradle.internal.remote.ConnectionAcceptor
@@ -41,6 +42,7 @@ import org.apache.maven.artifact.versioning.ComparableVersion
 import org.gradle.internal.remote.internal.hub.MessageHubBackedObjectConnection
 import org.gradle.internal.remote.internal.inet.InetAddressFactory
 import org.gradle.internal.remote.internal.inet.MultiChoiceAddress
+import org.gradle.internal.remote.internal.inet.TcpIncomingConnector
 import org.gradle.internal.time.Clock
 import org.gradle.internal.work.WorkerLeaseService
 import org.gradle.process.internal.JavaExecHandleFactory
@@ -63,8 +65,9 @@ class DockerizedTestPlugin implements Plugin<Project> {
     this.messagingServer = new MessageServer(messagingServer.connector, messagingServer.executorFactory)
     this.addressFactory = new InetAddressFactoryWildcardDelegate(addressFactory)
   }
+// TODO parallel forks vs parallel tasks - look into
 
-  // just crazy attempt to override TODO eventually remove
+  // TODO verify if this is ok to keep, works fine this way (basically overriding localBinding to wildcard binding to work with docker in bridge mode
   class InetAddressFactoryWildcardDelegate extends InetAddressFactory {
 
     @Delegate
@@ -75,7 +78,6 @@ class DockerizedTestPlugin implements Plugin<Project> {
     }
 
     InetAddress getLocalBindingAddress(){
-      println("Hello there!")
       getWildcardBindingAddress()
     }
 
@@ -96,8 +98,6 @@ class DockerizedTestPlugin implements Plugin<Project> {
       def extension = test.extensions.docker
 
       if (extension?.image) {
-//                println("XXXXXXXX" + test)
-//                println("XXXXXXXX" + services.get(FileCollectionFactory).toString())
         workerSemaphore.applyTo(test.project)
         test.testExecuter = new TestExecuter(newProcessBuilderFactory(project, extension, test.processBuilderFactory, startParameter.gradleUserHomeDir, services), actorFactory, moduleRegistry, services.get(BuildOperationExecutor), services.get(Clock), services.get(WorkerLeaseService));
 
@@ -113,8 +113,7 @@ class DockerizedTestPlugin implements Plugin<Project> {
     DockerClientBuilder.getInstance(DefaultDockerClientConfig.createDefaultConfigBuilder()
         .withDockerHost("unix:///var/run/docker.sock").build())
         .withDockerHttpClient(new ApacheDockerHttpClient.Builder().dockerHost(URI.create("unix:///var/run/docker.sock")).build())
-    // TODO?
-//                    .withDockerCmdExecFactory(new DockerHttpClient()new NettyDockerCmdExecFactory())
+    // TODO handle docker URI on different platforms or parametrize
         .build()
   }
 
@@ -170,7 +169,8 @@ class DockerizedTestPlugin implements Plugin<Project> {
     }
 
     ConnectionAcceptor accept(Action<ObjectConnection> action) {
-      return new ConnectionAcceptorDelegate(connector.accept(new ConnectEventAction(action, executorFactory), true))
+      TcpIncomingConnector myconnector = new TcpIncomingConnector(executorFactory,addressFactory,new UUIDGenerator())
+      return new ConnectionAcceptorDelegate(myconnector.accept(new ConnectEventAction(action, executorFactory), true))
     }
 
 
@@ -206,11 +206,6 @@ class DockerizedTestPlugin implements Plugin<Project> {
         if (address == null) {
 
           def remoteAddresses = NetworkInterface.networkInterfaces.findAll { it.up && !it.loopback }*.inetAddresses*.collect { it }.flatten()
-//          remoteAddresses.add(InetAddress.getByName("host.docker.internal"))
-//          println "REMOTEEEEEE:" + remoteAddresses
-          println "ADDR " + delegate.address.canonicalAddress
-          println "PORT " + delegate.address.port
-          remoteAddresses.add(InetAddress.getByName("eopng-test-master"))
           def original = delegate.address
           address = new MultiChoiceAddress(original.canonicalAddress, original.port, remoteAddresses)
         }
