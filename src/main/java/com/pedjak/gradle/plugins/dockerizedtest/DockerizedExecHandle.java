@@ -408,9 +408,8 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings {
                     .withStdinOpen(true)
                     .withStdInOnce(true)
                     .withWorkingDir(directory.getAbsolutePath())
-                    .withExtraHosts("eopng-test-master:172.17.0.1");
-//                    .withNetworkMode("host"); // TODO hhandle security if possible
-            // FIXME host exposes also ports of host network instead of docker own network
+                    .withExtraHosts("eopng-test-master:127.0.0.1","eopng-test-site1:127.0.0.1","eopng-test-site2:127.0.0.1");
+            // TODO add support for providing extra hosts (bindings?)
 
             // FIXME this does not allow to run java
             //            createCmd.withEnv(getEnv());
