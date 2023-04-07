@@ -511,16 +511,18 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings {
     }
 
     private void bindVolumes(CreateContainerCmd cmd) {
-        List<Volume> volumes = new ArrayList<Volume>();
-        List<Bind> binds = new ArrayList<Bind>();
+        List<Volume> volumes = new ArrayList<>();
+        List<Bind> binds = new ArrayList<>();
         for (final Object o : testExtension.getVolumes().entrySet()) {
             Map.Entry<Object, Object> e = (Map.Entry<Object, Object>) o;
             Volume volume = new Volume(e.getValue().toString());
+//            System.out.println(volume.toString());
             Bind bind = new Bind(e.getKey().toString(), volume);
             binds.add(bind);
             volumes.add(volume);
         }
         cmd.withVolumes(volumes).withBinds(binds);
+//        System.out.println(cmd);
     }
 
     private static class ExecResultImpl implements ExecResult {

@@ -1,9 +1,12 @@
 package com.pedjak.gradle.plugins.dockerizedtest;
 
 import java.io.File;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
+import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.SystemUtils;
 import org.gradle.api.Action;
 import org.gradle.api.internal.classpath.ModuleRegistry;
 import org.gradle.api.internal.tasks.testing.*;
@@ -101,7 +104,7 @@ public class ForkingTestClassProcessor implements TestClassProcessor
     }
 
     List<URL> getTestWorkerImplementationClasspath() {
-        return CollectionUtils.flattenCollections(URL.class,
+        List<URL> urls = CollectionUtils.flattenCollections(URL.class,
                 moduleRegistry.getModule("gradle-core-api").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getModule("gradle-core").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getModule("gradle-logging-api").getImplementationClasspath().getAsURLs(),
@@ -128,9 +131,22 @@ public class ForkingTestClassProcessor implements TestClassProcessor
                 moduleRegistry.getExternalModule("commons-lang").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getExternalModule("junit").getImplementationClasspath().getAsURLs(),
                 moduleRegistry.getExternalModule("junit-platform-launcher").getImplementationClasspath().getAsURLs(),
-//                moduleRegistry.getExternalModule("junit5").getImplementationClasspath().getAsURLs(),
                 ForkingTestClassProcessor.class.getProtectionDomain().getCodeSource().getLocation()
         );
+        if (SystemUtils.IS_OS_WINDOWS) {
+            // TODO add support for other drives apart from C (configurable?)
+            urls = urls.stream()
+                    .map(url -> url.toExternalForm().replaceAll("\\\\", "/").replaceAll("C:", "/C").replaceAll("//", "/").replaceAll(";", ":"))
+                    .map(spec -> {
+                        try {
+                            return new URL(spec);
+                        } catch (MalformedURLException e) {
+                            return null;
+                        }
+                    })
+                    .collect(Collectors.toList());
+        }
+        return urls;
     }
 
     @Override
@@ -140,6 +156,8 @@ public class ForkingTestClassProcessor implements TestClassProcessor
                 remoteProcessor.stop();
                 workerProcess.waitForStop();
             } finally {
+
+                // TODO verify if there is a failure that container should be removed (might not be this exact place
                 // do nothing
             }
         }

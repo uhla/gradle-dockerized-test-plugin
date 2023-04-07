@@ -25,7 +25,27 @@ test {
   useJUnitPlatform()
   docker {
     image = 'eclipse-temurin:11-jre-alpine'
-    // use podman on win, docker on linux
-    socketAddress = Os.isFamily(Os.FAMILY_WINDOWS) ? '//./pipe/podman-machine-default' : 'unix:///var/run/docker.sock'
+//    // use podman docker engine npipe on win, docker on linux
+    // TODO add to readme docs
+//    socketAddress = Os.isFamily(Os.FAMILY_WINDOWS) ? 'npipe:////./pipe/docker_engine' : 'unix:///var/run/docker.sock'
+
+    // TODO figure out volume binding on windows to linux if possible (probably needs explicit redefinition in plugin config)
+    volumes = ["c:":"/C"]
+
+    // TODO a bit hacky way of remapping windows containers
+    beforeContainerCreate = { cmd ->
+      println cmd.cmd
+      def file = new File(cmd.cmd[1].substring(1))
+
+      file.text = fixPath(file.text)
+
+      cmd.withWorkingDir(fixPath(project.rootDir.absolutePath))
+      cmd.withEnv([])
+      cmd.withCmd(cmd.cmd.collect{fixPath(it)})
+    }
   }
+}
+
+private String fixPath(String path) {
+  path.replaceAll("\\\\", "/").replaceAll("C:", "/C").replaceAll("//", "/").replaceAll(";", ":")
 }

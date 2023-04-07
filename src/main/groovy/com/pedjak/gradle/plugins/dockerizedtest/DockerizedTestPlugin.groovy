@@ -17,9 +17,11 @@
 package com.pedjak.gradle.plugins.dockerizedtest
 
 import com.github.dockerjava.api.DockerClient
+import com.github.dockerjava.api.command.PullImageResultCallback
 import com.github.dockerjava.core.DefaultDockerClientConfig
 import com.github.dockerjava.core.DockerClientBuilder
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient
+import org.apache.tools.ant.taskdefs.condition.Os
 import org.gradle.api.*
 import org.gradle.api.internal.file.FileCollectionFactory
 import org.gradle.api.internal.file.temp.TemporaryFileProvider
@@ -104,18 +106,19 @@ class DockerizedTestPlugin implements Plugin<Project> {
         if (!extension.client) {
           extension.client = createDefaultClient(extension.socketAddress)
         }
+        def pullCmd = ((DockerClient) extension.client).pullImageCmd(extension.image)
+        pullCmd.exec(new PullImageResultCallback()).awaitCompletion()
       }
 
     }
   }
 
   static DockerClient createDefaultClient(String socketAddress) {
-    socketAddress ?= "unix:///var/run/docker.sock"
-    println socketAddress
+    // on windows use podman docker npipe by default, on linux use docker socker
+    socketAddress ?= Os.isFamily(Os.FAMILY_WINDOWS) ? 'npipe:////./pipe/docker_engine' : 'unix:///var/run/docker.sock'
     DockerClientBuilder.getInstance(DefaultDockerClientConfig.createDefaultConfigBuilder()
         .withDockerHost(socketAddress).build())
         .withDockerHttpClient(new ApacheDockerHttpClient.Builder().dockerHost(URI.create(socketAddress)).build())
-    // TODO handle docker URI on different platforms or parametrize
         .build()
   }
 
