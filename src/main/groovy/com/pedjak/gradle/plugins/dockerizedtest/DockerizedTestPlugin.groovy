@@ -102,17 +102,19 @@ class DockerizedTestPlugin implements Plugin<Project> {
         test.testExecuter = new TestExecuter(newProcessBuilderFactory(project, extension, test.processBuilderFactory, startParameter.gradleUserHomeDir, services), actorFactory, moduleRegistry, services.get(BuildOperationExecutor), services.get(Clock), services.get(WorkerLeaseService));
 
         if (!extension.client) {
-          extension.client = createDefaultClient()
+          extension.client = createDefaultClient(extension.socketAddress)
         }
       }
 
     }
   }
 
-  static DockerClient createDefaultClient() {
+  static DockerClient createDefaultClient(String socketAddress) {
+    socketAddress ?= "unix:///var/run/docker.sock"
+    println socketAddress
     DockerClientBuilder.getInstance(DefaultDockerClientConfig.createDefaultConfigBuilder()
-        .withDockerHost("unix:///var/run/docker.sock").build())
-        .withDockerHttpClient(new ApacheDockerHttpClient.Builder().dockerHost(URI.create("unix:///var/run/docker.sock")).build())
+        .withDockerHost(socketAddress).build())
+        .withDockerHttpClient(new ApacheDockerHttpClient.Builder().dockerHost(URI.create(socketAddress)).build())
     // TODO handle docker URI on different platforms or parametrize
         .build()
   }

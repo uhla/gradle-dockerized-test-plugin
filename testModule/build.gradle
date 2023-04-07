@@ -1,6 +1,8 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
 plugins {
-    id("java")
-    id("com.github.pedjak.dockerized-test") version "0.5.11-SNAPSHOT"
+  id("java")
+  id("com.github.pedjak.dockerized-test") version "0.5.11-SNAPSHOT"
 }
 
 apply plugin: 'com.github.pedjak.dockerized-test'
@@ -9,19 +11,21 @@ group = "org.example"
 version = "1.0-SNAPSHOT"
 
 repositories {
-    mavenCentral()
-    // TODO just temporary
-    mavenLocal()
+  mavenCentral()
+  // TODO just temporary
+  mavenLocal()
 }
 
 dependencies {
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.1")
+  testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
+  testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.1")
 }
 
 test {
-    useJUnitPlatform()
-    docker {
-        image = 'eclipse-temurin:11-jre-alpine'
-    }
+  useJUnitPlatform()
+  docker {
+    image = 'eclipse-temurin:11-jre-alpine'
+    // use podman on win, docker on linux
+    socketAddress = Os.isFamily(Os.FAMILY_WINDOWS) ? '//./pipe/podman-machine-default' : 'unix:///var/run/docker.sock'
+  }
 }

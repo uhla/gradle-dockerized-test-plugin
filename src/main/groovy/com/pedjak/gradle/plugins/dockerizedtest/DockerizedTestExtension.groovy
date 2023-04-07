@@ -24,6 +24,8 @@ class DockerizedTestExtension {
     Map volumes
     String user
 
+    String socketAddress
+
     Closure beforeContainerCreate
 
     Closure afterContainerCreate
