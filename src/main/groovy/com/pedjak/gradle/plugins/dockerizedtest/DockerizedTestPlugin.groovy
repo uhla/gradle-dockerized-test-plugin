@@ -117,7 +117,7 @@ class DockerizedTestPlugin implements Plugin<Project> {
 
   static DockerClient createDefaultClient(String socketAddress) {
     // on windows use podman docker npipe by default, on linux use docker socker
-    socketAddress ?= Os.isFamily(Os.FAMILY_WINDOWS) ? 'npipe:////./pipe/docker_engine' : 'unix://localhost:2375'
+    socketAddress ?= Os.isFamily(Os.FAMILY_WINDOWS) ? 'npipe:////./pipe/docker_engine' : 'unix:///var/run/docker.sock'
     DockerClientBuilder.getInstance(DefaultDockerClientConfig.createDefaultConfigBuilder()
         .withDockerHost(socketAddress).build())
         .withDockerHttpClient(new ApacheDockerHttpClient.Builder().dockerHost(URI.create(socketAddress)).build())

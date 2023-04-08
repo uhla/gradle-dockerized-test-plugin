@@ -34,3 +34,5 @@ For convenience testing there is testModule directory `./gradlew test` inside th
 ----------------
 
 Consider using ryuk container to shutdown inactive containers if something fails and does not clean up properly
+
+See RyukResourceReaper in testcontainers repo/lib
