@@ -34,9 +34,10 @@ test {
     // TODO add to readme docs
 //    socketAddress = Os.isFamily(Os.FAMILY_WINDOWS) ? 'npipe:////./pipe/docker_engine' : 'unix:///var/run/docker.sock'
 
-    // TODO figure out volume binding on windows to linux if possible (probably needs explicit redefinition in plugin config)
+//    // TODO figure out volume binding on windows to linux if possible (probably needs explicit redefinition in plugin config)
 //    volumes = ["c:":"/C"]
 //
+//    ref: https://github.com/pedjak/gradle-dockerized-test-plugin/issues/13
 //    // TODO a bit hacky way of remapping windows containers
 //    beforeContainerCreate = { cmd ->
 //      println cmd.cmd

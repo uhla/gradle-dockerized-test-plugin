@@ -8,3 +8,24 @@ Need to route traffic podman container -> podman gateway (10.88.0.1/host.contain
 + deal with firewall issues.
 
 This is pretty advanced networking stuff, so will have to be sorted out in the future (and all these things should be configurable from extension)
+
+
+--------------
+Connecting from WSL to Host (with port open in win firewall)
+
+# windows ethernet interface on host
+nc -vz 10.xx.xx.xx 49664
+Connection to 10.xx.xx.xx 49664 port [tcp/*] succeeded!
+
+# wlan on win host
+nc -vz 192.168.xx.xx 49664
+timeout
+
+# WSL ethernet bridge interface on win host
+nc -vz 172.yy.yy.yy 49664
+Connection to 172.yy.yy.yy 49664 port [tcp/*] succeeded!
+
+
+------
+
+For convenience testing there is testModule directory `./gradlew test` inside the module
