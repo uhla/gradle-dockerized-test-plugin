@@ -23,29 +23,36 @@ dependencies {
 
 test {
   useJUnitPlatform()
+
   docker {
     image = 'eclipse-temurin:11-jre-alpine'
-//    // use podman docker engine npipe on win, docker on linux
+
+
+
+// Windows testing
+    //    // use podman docker engine npipe on win, docker on linux
     // TODO add to readme docs
 //    socketAddress = Os.isFamily(Os.FAMILY_WINDOWS) ? 'npipe:////./pipe/docker_engine' : 'unix:///var/run/docker.sock'
 
     // TODO figure out volume binding on windows to linux if possible (probably needs explicit redefinition in plugin config)
-    volumes = ["c:":"/C"]
-
-    // TODO a bit hacky way of remapping windows containers
-    beforeContainerCreate = { cmd ->
-      println cmd.cmd
-      def file = new File(cmd.cmd[1].substring(1))
-
-      file.text = fixPath(file.text)
-
-      cmd.withWorkingDir(fixPath(project.rootDir.absolutePath))
-      cmd.withEnv([])
-      cmd.withCmd(cmd.cmd.collect{fixPath(it)})
-    }
+//    volumes = ["c:":"/C"]
+//
+//    // TODO a bit hacky way of remapping windows containers
+//    beforeContainerCreate = { cmd ->
+//      println cmd.cmd
+//      // TODO wanna arg that starts with @ --> find it instead of hardcoded index
+//      def file = new File(cmd.cmd[4].substring(1))
+//
+//      file.text = fixPath(file.text)
+//
+//      cmd.withWorkingDir(fixPath(project.rootDir.absolutePath))
+//      cmd.withEnv([])
+//      cmd.withCmd(cmd.cmd.collect{fixPath(it)})
+//    }
   }
 }
 
-private String fixPath(String path) {
-  path.replaceAll("\\\\", "/").replaceAll("C:", "/C").replaceAll("//", "/").replaceAll(";", ":")
-}
+//private String fixPath(String path) {
+//  path.replaceAll("\\\\", "/").replaceAll("C:", "/C").replaceAll("//", "/").replaceAll(";", ":")
+//}
+

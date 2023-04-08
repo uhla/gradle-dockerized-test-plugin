@@ -80,6 +80,8 @@ class DockerizedTestPlugin implements Plugin<Project> {
     }
 
     InetAddress getLocalBindingAddress(){
+      // configurable?
+//      InetAddress.getByName("172.31.176.1")
       getWildcardBindingAddress()
     }
 
@@ -211,6 +213,10 @@ class DockerizedTestPlugin implements Plugin<Project> {
         if (address == null) {
 
           def remoteAddresses = NetworkInterface.networkInterfaces.findAll { it.up && !it.loopback }*.inetAddresses*.collect { it }.flatten()
+          // host.containers.internal podamn TODO in windows - see notes_improvements.txt
+//          remoteAddresses.add(InetAddress.getByName("10.88.0.1"))
+          // TODO this won't work as it's executed on a host
+//          remoteAddresses.add(InetAddress.getByName("host.containers.internal"))
           def original = delegate.address
           address = new MultiChoiceAddress(original.canonicalAddress, original.port, remoteAddresses)
         }

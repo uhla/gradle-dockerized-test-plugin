@@ -1,0 +1,10 @@
+Windows with podman:
+
+Podman is running in WSL2 with interface podman0
+Gradle main worker process is running from windows host
+WSL has bridge adapter interface defined in windows
+
+Need to route traffic podman container -> podman gateway (10.88.0.1/host.containers.internal) -> foward to windows host
++ deal with firewall issues.
+
+This is pretty advanced networking stuff, so will have to be sorted out in the future (and all these things should be configurable from extension)

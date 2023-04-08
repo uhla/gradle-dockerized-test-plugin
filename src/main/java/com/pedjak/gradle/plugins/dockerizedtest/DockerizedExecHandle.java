@@ -202,6 +202,7 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings {
     private boolean stateIn(ExecHandleState... states) {
         lock.lock();
         try {
+
             return Arrays.asList(states).contains(this.state);
         } finally {
             lock.unlock();
@@ -272,7 +273,6 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings {
 //            }
             execHandleRunner = new DockerizedExecHandleRunner(this, new CompositeStreamsHandler(), executor);
             executor.execute(new CurrentBuildOperationPreservingRunnable(execHandleRunner));
-
             while (stateIn(ExecHandleState.STARTING)) {
                 LOGGER.debug("Waiting until process started: {}.", displayName);
                 try {
@@ -409,6 +409,7 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings {
                     .withStdInOnce(true)
                     .withWorkingDir(directory.getAbsolutePath())
                     .withExtraHosts("eopng-test-master:127.0.0.1","eopng-test-site1:127.0.0.1","eopng-test-site2:127.0.0.1");
+//                    .withNetworkMode("host");// TODO tmp - win works on host
             // TODO add support for providing extra hosts (bindings?)
 
             // FIXME this does not allow to run java
@@ -430,10 +431,8 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings {
 
             // TODO debug
 //            System.out.println(createCmd);
-
             invokeIfNotNull(testExtension.getBeforeContainerCreate(), createCmd, client);
             String containerId = createCmd.exec().getId();
-
             invokeIfNotNull(testExtension.getAfterContainerCreate(), containerId, client);
 
             maybeCopyJvmOptionFile(containerId, client);
@@ -443,17 +442,14 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings {
 //            System.out.println(state1.toString());
 
             client.startContainerCmd(containerId).exec();
-            client.attachContainerCmd(containerId).start().awaitCompletion();
-            // debug stuff TODO remove
-//            final InspectContainerResponse.ContainerState state2 = client.inspectContainerCmd(containerId).exec().getState();
-//            System.out.println(state2.toString());
+
+
 
             invokeIfNotNull(testExtension.getAfterContainerStart(), containerId, client);
 
             if (Boolean.FALSE.equals(client.inspectContainerCmd(containerId).exec().getState().getRunning())) {
                 throw new RuntimeException("Container " + containerId + " not running!");
             }
-
             return new DockerizedProcess(client, containerId, testExtension.getAfterContainerStop());
         } catch (Exception e) {
             LOGGER.error("Failed to create container " + displayName, new RuntimeException(e));
@@ -516,13 +512,11 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings {
         for (final Object o : testExtension.getVolumes().entrySet()) {
             Map.Entry<Object, Object> e = (Map.Entry<Object, Object>) o;
             Volume volume = new Volume(e.getValue().toString());
-//            System.out.println(volume.toString());
             Bind bind = new Bind(e.getKey().toString(), volume);
             binds.add(bind);
             volumes.add(volume);
         }
         cmd.withVolumes(volumes).withBinds(binds);
-//        System.out.println(cmd);
     }
 
     private static class ExecResultImpl implements ExecResult {
