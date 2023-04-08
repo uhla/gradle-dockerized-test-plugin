@@ -29,3 +29,8 @@ Connection to 172.yy.yy.yy 49664 port [tcp/*] succeeded!
 ------
 
 For convenience testing there is testModule directory `./gradlew test` inside the module
+
+
+----------------
+
+Consider using ryuk container to shutdown inactive containers if something fails and does not clean up properly
