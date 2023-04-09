@@ -536,27 +536,29 @@ public class DockerizedExecHandle implements ExecHandle, ProcessSettings {
 
         public ExecResult assertNormalExitValue() throws ExecException {
             // all exit values are ok
-            // TODO are they?
-//            > Task :ExternalInterfaces:test FAILED
-//            Could not stop org.gradle.internal.actor.internal.DefaultActorFactory$NonBlockingActor@20d22251.
-//            org.gradle.internal.dispatch.DispatchException: Could not dispatch message [MethodInvocation method: stop()].
-//            at org.gradle.internal.dispatch.ExceptionTrackingFailureHandler.dispatchFailed(ExceptionTrackingFailureHandler.java:35)
-//            at org.gradle.internal.dispatch.FailureHandlingDispatch.dispatch(FailureHandlingDispatch.java:32)
-//            at org.gradle.internal.dispatch.AsyncDispatch.dispatchMessages(AsyncDispatch.java:87)
-//            at org.gradle.internal.dispatch.AsyncDispatch.access$000(AsyncDispatch.jav5555a:36)
-//            at org.gradle.internal.dispatch.AsyncDispatch$1.run(AsyncDispatch.java:71)
-//            at org.gradle.internal.concurrent.InterruptibleRunnable.run(InterruptibleRunnable.java:42)
-//            at org.gradle.internal.operations.CurrentBuildOperationPreservingRunnable.run(CurrentBuildOperationPreservingRunnable.java:42)
-//            at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
-//            at org.gradle.internal.concurrent.ManagedExecutorImpl$1.run(ManagedExecutorImpl.java:49)
-//            at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1128)
-//            at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:628)
-//            at java.base/java.lang.Thread.run(Thread.java:829)
-//            Caused by: org.gradle.process.internal.ExecException: Process 'Gradle Test Executor 71' finished with non-zero exit value 156
-//            at com.pedjak.gradle.plugins.dockerizedtest.DockerizedExecHandle$ExecResultImpl.assertNormalExitValue(DockerizedExecHandle.java:543)
-//            if (exitValue != 0) {
-//                throw new ExecException(format("Process '%s' finished with non-zero exit value %d", displayName, exitValue));
-//            }
+            // TODO are they? This actually causes the long running containers to look like the hanging or long running test test is successful (there is no error, it's just not counted)
+            //            > Task :ExternalInterfaces:test FAILED
+            //            Could not stop org.gradle.internal.actor.internal.DefaultActorFactory$NonBlockingActor@20d22251.
+            //            org.gradle.internal.dispatch.DispatchException: Could not dispatch message [MethodInvocation method: stop()].
+            //            at org.gradle.internal.dispatch.ExceptionTrackingFailureHandler.dispatchFailed(ExceptionTrackingFailureHandler.java:35)
+            //            at org.gradle.internal.dispatch.FailureHandlingDispatch.dispatch(FailureHandlingDispatch.java:32)
+            //            at org.gradle.internal.dispatch.AsyncDispatch.dispatchMessages(AsyncDispatch.java:87)
+            //            at org.gradle.internal.dispatch.AsyncDispatch.access$000(AsyncDispatch.jav5555a:36)
+            //            at org.gradle.internal.dispatch.AsyncDispatch$1.run(AsyncDispatch.java:71)
+            //            at org.gradle.internal.concurrent.InterruptibleRunnable.run(InterruptibleRunnable.java:42)
+            //            at org.gradle.internal.operations.CurrentBuildOperationPreservingRunnable.run(CurrentBuildOperationPreservingRunnable.java:42)
+            //            at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+            //            at org.gradle.internal.concurrent.ManagedExecutorImpl$1.run(ManagedExecutorImpl.java:49)
+            //            at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1128)
+            //            at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:628)
+            //            at java.base/java.lang.Thread.run(Thread.java:829)
+            //            Caused by: org.gradle.process.internal.ExecException: Process 'Gradle Test Executor 71' finished with non-zero exit value 156
+            //            at com.pedjak.gradle.plugins.dockerizedtest.DockerizedExecHandle$ExecResultImpl.assertNormalExitValue(DockerizedExecHandle.java:543)
+
+            if (exitValue != 0) {
+                failure.printStackTrace();
+                throw new ExecException(format("Process '%s' finished with non-zero exit value %d", displayName, exitValue));
+            }
             return this;
         }
 

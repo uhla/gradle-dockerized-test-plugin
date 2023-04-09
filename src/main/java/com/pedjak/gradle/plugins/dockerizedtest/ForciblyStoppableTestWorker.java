@@ -10,7 +10,7 @@ import org.gradle.api.internal.tasks.testing.worker.TestWorker;
 public class ForciblyStoppableTestWorker extends TestWorker
 {
     // TODO make configurable, maybe propagate error to show failure of the test rather than ignore in case worker is stopped because of this?
-    private static final int SHUTDOWN_TIMEOUT = 120; // secs
+    private static final int SHUTDOWN_TIMEOUT = 300; // secs
 
     public ForciblyStoppableTestWorker(WorkerTestClassProcessorFactory factory)
     {
